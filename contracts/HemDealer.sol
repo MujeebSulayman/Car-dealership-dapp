@@ -5,16 +5,26 @@ import '@openzeppelin/contracts/token/ERC721/ERC721.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/security/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/utils/Counters.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
   using Counters for Counters.Counter;
+  using SafeERC20 for IERC20;
 
   Counters.Counter private _totalCars;
   Counters.Counter private _totalSales;
-  Counters.Counter private _totalReviews;
 
   mapping(uint256 => CarStruct) private cars;
   mapping(uint256 => SalesStruct[]) private sales;
+
+  address public acrossRouter;
+  mapping(address => bool) public supportedTokens;
+  mapping(uint256 => uint256) public destinationChainIds;
+
+  mapping(uint256 => bool) public crossChainTransferPending;
+  mapping(uint256 => uint256) public sourceChainIds;
+  mapping(bytes32 => uint256) public transferHashes;
 
   struct CarStruct {
     uint256 id;
@@ -34,10 +44,12 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     uint256 price;
     string location;
     string[] features;
-    ReviewStruct[] reviews;
     SellerDetails seller;
     bool sold;
     bool deleted;
+    uint256 destinationChainId;
+    address paymentToken;
+    uint256 sourceChainId;
   }
 
   enum CarCondition {
@@ -69,14 +81,6 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     string email;
     uint256 phoneNumber;
     string profileImage;
-  }
-
-  struct ReviewStruct {
-    uint256 reviewId;
-    address reviewer;
-    string comment;
-    uint256 timestamp;
-    bool deleted;
   }
 
   struct CarBasicDetails {
@@ -113,19 +117,43 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
   );
   event CarUpdated(uint256 indexed carId, address indexed owner);
   event CarDeleted(uint256 indexed carId, address indexed owner);
-  event ReviewAdded(uint256 indexed carId, uint256 indexed reviewId, address indexed reviewer);
-  event ReviewDeleted(uint256 indexed carId, uint256 indexed reviewId);
+  event CrossChainTransferInitiated(
+    uint256 indexed carId,
+    uint256 sourceChainId,
+    uint256 destinationChainId,
+    address indexed seller,
+    address indexed buyer
+  );
+  event CrossChainTransferCompleted(
+    uint256 indexed carId,
+    uint256 destinationChainId,
+    address indexed newOwner
+  );
 
-  constructor() ERC721('HemDealer', 'HDM') {
+  constructor(address _acrossRouter) ERC721('HemDealer', 'HDM') {
     require(msg.sender != address(0), 'Invalid deployer');
+    require(_acrossRouter != address(0), 'Invalid router');
+    acrossRouter = _acrossRouter;
+  }
+
+  function addSupportedToken(address token) external onlyOwner {
+    require(token != address(0), 'Invalid token');
+    supportedTokens[token] = true;
+  }
+
+  function removeSupportedToken(address token) external onlyOwner {
+    supportedTokens[token] = false;
   }
 
   function listCar(
     CarBasicDetails calldata basicDetails,
     CarTechnicalDetails calldata technicalDetails,
     CarAdditionalInfo calldata additionalInfo,
-    SellerDetails calldata sellerDetails
+    SellerDetails calldata sellerDetails,
+    uint256 destinationChainId,
+    address paymentToken
   ) public nonReentrant {
+    require(supportedTokens[paymentToken], 'Unsupported payment token');
     require(
       msg.sender == sellerDetails.wallet && sellerDetails.wallet != address(0),
       'Invalid seller'
@@ -156,11 +184,15 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
       technicalDetails.price,
       additionalInfo.location,
       additionalInfo.features,
-      new ReviewStruct[](0),
       sellerDetails,
       false,
-      false
+      false,
+      destinationChainId,
+      paymentToken,
+      0
     );
+
+    destinationChainIds[newCarId] = destinationChainId;
 
     _safeMint(msg.sender, newCarId);
     emit CarListed(newCarId, msg.sender, technicalDetails.price);
@@ -211,10 +243,12 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
       technicalDetails.price,
       additionalInfo.location,
       additionalInfo.features,
-      cars[newCarId].reviews,
       sellerDetails,
       cars[newCarId].sold,
-      false
+      false,
+      cars[newCarId].destinationChainId,
+      cars[newCarId].paymentToken,
+      cars[newCarId].sourceChainId
     );
     emit CarUpdated(newCarId, msg.sender);
   }
@@ -287,95 +321,149 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
   }
 
   function buyCar(uint256 carId) public payable nonReentrant carExists(carId) {
-    require(!cars[carId].sold && msg.sender != cars[carId].owner, 'Invalid purchase');
-    require(msg.value == cars[carId].price, 'Incorrect payment');
+    CarStruct storage car = cars[carId];
+    require(!car.sold && msg.sender != car.owner, 'Invalid purchase');
 
-    address seller = cars[carId].owner;
-    uint256 payment = msg.value;
+    if (car.paymentToken == address(0)) {
+      require(msg.value == car.price, 'Incorrect payment');
 
-    cars[carId].sold = true;
-    cars[carId].owner = msg.sender;
+      // Bridge ETH to destination chain
+      (bool success, ) = acrossRouter.call{ value: msg.value }(
+        abi.encodeWithSignature(
+          'deposit(address,uint256,uint256)',
+          car.seller.wallet,
+          car.destinationChainId,
+          0 // Min amount out
+        )
+      );
+      require(success, 'Bridge transfer failed');
+    } else {
+      require(msg.value == 0, 'ETH not accepted');
+      IERC20 token = IERC20(car.paymentToken);
+
+      // Transfer tokens from buyer to this contract
+      token.safeTransferFrom(msg.sender, address(this), car.price);
+
+      // Approve router to spend tokens
+      token.safeApprove(acrossRouter, car.price);
+
+      // Bridge tokens to destination chain
+      (bool success, ) = acrossRouter.call(
+        abi.encodeWithSignature(
+          'depositERC20(address,address,uint256,uint256,uint256)',
+          car.paymentToken,
+          car.seller.wallet,
+          car.price,
+          car.destinationChainId,
+          0 // Min amount out
+        )
+      );
+      require(success, 'Bridge transfer failed');
+    }
+
+    if (car.destinationChainId != block.chainid) {
+      // Initiate cross-chain transfer if buyer is on different chain
+      initiateCrossChainTransfer(carId, car.destinationChainId);
+    } else {
+      // Regular same-chain transfer
+      car.sold = true;
+      car.owner = msg.sender;
+      _transfer(car.seller.wallet, msg.sender, carId);
+    }
 
     _totalSales.increment();
     sales[carId].push(
-      SalesStruct({ id: _totalSales.current(), newCarId: carId, price: payment, owner: msg.sender })
+      SalesStruct({
+        id: _totalSales.current(),
+        newCarId: carId,
+        price: car.price,
+        owner: msg.sender
+      })
     );
 
-    _transfer(seller, msg.sender, carId);
-    payTo(seller, payment);
-
-    emit CarSold(carId, seller, msg.sender, payment);
-  }
-
-  function createReview(uint256 newCarId, string memory comment) public {
-    require(bytes(comment).length > 0, 'Comment cannot be empty');
-    require(!cars[newCarId].deleted, 'Car has been deleted from listing');
-    require(cars[newCarId].owner != address(0), 'Car does not exist');
-    require(msg.sender != cars[newCarId].owner, 'Cannot review your own car');
-    require(bytes(comment).length <= 1000, 'Comment too long');
-
-    _totalReviews.increment();
-
-    ReviewStruct memory review;
-    review.reviewId = _totalReviews.current();
-    review.reviewer = msg.sender;
-    review.comment = comment;
-    review.timestamp = block.timestamp;
-
-    cars[newCarId].reviews.push(review);
-    emit ReviewAdded(newCarId, review.reviewId, msg.sender);
-  }
-
-  function deleteReview(uint256 newCarId, uint256 reviewId) public {
-    require(cars[newCarId].owner != address(0), 'Car does not exist');
-    require(!cars[newCarId].deleted, 'Car has been deleted');
-
-    bool found = false;
-    uint256 reviewIndex;
-    for (uint256 i = 0; i < cars[newCarId].reviews.length; i++) {
-      if (cars[newCarId].reviews[i].reviewId == reviewId) {
-        reviewIndex = i;
-        found = true;
-        break;
-      }
-    }
-
-    require(found, 'Review not found');
-    require(
-      cars[newCarId].reviews[reviewIndex].reviewer == msg.sender || msg.sender == owner(),
-      'Only reviewer or admin can delete'
-    );
-    require(!cars[newCarId].reviews[reviewIndex].deleted, 'Review already deleted');
-
-    cars[newCarId].reviews[reviewIndex].deleted = true;
-    emit ReviewDeleted(newCarId, reviewId);
-  }
-
-  function getReviews(uint256 newCarId) public view returns (ReviewStruct[] memory) {
-    require(!cars[newCarId].deleted, 'Car has been deleted');
-
-    uint256 count = 0;
-    for (uint i = 0; i < cars[newCarId].reviews.length; i++) {
-      if (!cars[newCarId].reviews[i].deleted) {
-        count++;
-      }
-    }
-
-    ReviewStruct[] memory reviewsList = new ReviewStruct[](count);
-
-    uint256 index = 0;
-    for (uint i = 0; i < cars[newCarId].reviews.length; i++) {
-      if (!cars[newCarId].reviews[i].deleted) {
-        reviewsList[index] = cars[newCarId].reviews[i];
-        index++;
-      }
-    }
-    return reviewsList;
+    emit CarSold(carId, car.seller.wallet, msg.sender, car.price);
   }
 
   function payTo(address to, uint256 price) internal {
     require(to != address(0), 'Cannot pay to zero address');
     (bool success, ) = payable(to).call{ value: price }('');
     require(success, 'Transfer failed');
+  }
+
+  function initiateCrossChainTransfer(
+    uint256 carId,
+    uint256 targetChainId
+  ) public onlyCarOwner(carId) {
+    require(!crossChainTransferPending[carId], 'Transfer already pending');
+    require(targetChainId != block.chainid, 'Same chain transfer not allowed');
+
+    CarStruct storage car = cars[carId];
+
+    // Create transfer message
+    bytes memory message = abi.encode(carId, car.owner, block.chainid, car.price, car.seller);
+
+    // Send message to target chain via Across router
+    (bool success, ) = acrossRouter.call(
+      abi.encodeWithSignature('sendMessage(uint256,bytes)', targetChainId, message)
+    );
+    require(success, 'Failed to initiate transfer');
+
+    // Mark transfer as pending
+    crossChainTransferPending[carId] = true;
+    sourceChainIds[carId] = block.chainid;
+
+    emit CrossChainTransferInitiated(
+      carId,
+      block.chainid,
+      targetChainId,
+      car.owner,
+      car.seller.wallet
+    );
+  }
+
+  function receiveCrossChainTransfer(bytes memory message, uint256 sourceChainId) public {
+    require(msg.sender == acrossRouter, 'Only router can call');
+
+    // Decode transfer message
+    (
+      uint256 carId,
+      address originalOwner,
+      uint256 originalChainId,
+      uint256 price,
+      SellerDetails memory seller
+    ) = abi.decode(message, (uint256, address, uint256, uint256, SellerDetails));
+
+    // Create new car entry on this chain
+    _totalCars.increment();
+    uint256 newCarId = _totalCars.current();
+
+    // Copy car details from message
+    cars[newCarId] = CarStruct({
+      id: newCarId,
+      owner: originalOwner,
+      name: cars[carId].name,
+      images: cars[carId].images,
+      description: cars[carId].description,
+      make: cars[carId].make,
+      model: cars[carId].model,
+      year: cars[carId].year,
+      vin: cars[carId].vin,
+      mileage: cars[carId].mileage,
+      color: cars[carId].color,
+      condition: cars[carId].condition,
+      transmission: cars[carId].transmission,
+      fuelType: cars[carId].fuelType,
+      price: price,
+      location: cars[carId].location,
+      features: cars[carId].features,
+      seller: seller,
+      sold: false,
+      deleted: false,
+      destinationChainId: block.chainid,
+      paymentToken: cars[carId].paymentToken,
+      sourceChainId: originalChainId
+    });
+
+    emit CrossChainTransferCompleted(newCarId, block.chainid, originalOwner);
   }
 }

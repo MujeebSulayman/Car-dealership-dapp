@@ -1,4 +1,5 @@
-require("@nomicfoundation/hardhat-toolbox");
+require('@nomicfoundation/hardhat-toolbox')
+require('dotenv').config()
 
 module.exports = {
   defaultNetwork: 'localhost',
@@ -9,8 +10,9 @@ module.exports = {
     },
   },
   solidity: {
-    version: '0.8.17',
+    version: '0.8.19',
     settings: {
+      viaIR: true,
       optimizer: {
         enabled: true,
         runs: 200,

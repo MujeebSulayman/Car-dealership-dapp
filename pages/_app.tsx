@@ -7,7 +7,7 @@ import { Providers } from '@/services/provider'
 import type { AppProps } from 'next/app'
 import Header from '@/components/Header'
 import { Provider } from 'react-redux'
-import { store } from '@/store'
+
 
 export default function App({ Component, pageProps }: AppProps) {
   const [showChild, setShowChild] = useState<boolean>(false)
@@ -20,8 +20,8 @@ export default function App({ Component, pageProps }: AppProps) {
     return null
   } else {
     return (
-      <Providers pageProps={pageProps}>
-        <Provider store={store}>
+      <Providers>
+        <Provider>
           <div className="min-h-screen bg-gray-100">
             <Header />
             <div className="mt-10 h-20 "></div>

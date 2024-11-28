@@ -9,46 +9,13 @@ import '@openzeppelin/contracts/utils/Counters.sol';
 contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
   using Counters for Counters.Counter;
 
-  // State Variables
   Counters.Counter private _totalCars;
   Counters.Counter private _totalSales;
   Counters.Counter private _totalReviews;
 
-  // Mappings
   mapping(uint256 => CarStruct) private cars;
   mapping(uint256 => SalesStruct[]) private sales;
-  mapping(uint256 => Auction) public carAuctions;
 
-  // Events - Single declaration of all events
-  event CarListed(
-    uint256 indexed carId,
-    address indexed seller,
-    uint256 price,
-    string make,
-    string model,
-    uint256 year
-  );
-  event CarSold(
-    uint256 indexed carId,
-    address indexed seller,
-    address indexed buyer,
-    uint256 price
-  );
-  event CarUpdated(
-    uint256 indexed carId,
-    address indexed owner,
-    uint256 newPrice,
-    string make,
-    string model
-  );
-  event CarDeleted(uint256 indexed carId);
-  event ReviewAdded(uint256 indexed carId, uint256 indexed reviewId, address indexed reviewer);
-  event ReviewDeleted(uint256 indexed carId, uint256 indexed reviewId);
-  event AuctionStarted(uint256 indexed carId, uint256 startingPrice, uint256 endTime);
-  event BidPlaced(uint256 indexed carId, address indexed bidder, uint256 amount);
-  event AuctionEnded(uint256 indexed carId, address indexed winner, uint256 amount);
-
-  // Structs (keeping only the essential fields)
   struct CarStruct {
     uint256 id;
     address owner;
@@ -71,10 +38,8 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     SellerDetails seller;
     bool sold;
     bool deleted;
-    SaleType saleType;
   }
 
-  // Enums
   enum CarCondition {
     New,
     Used,
@@ -90,12 +55,7 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     Electric,
     Hybrid
   }
-  enum SaleType {
-    FixedPrice,
-    Auction
-  }
 
-  // Structs
   struct SalesStruct {
     uint256 id;
     uint256 newCarId;
@@ -117,15 +77,6 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     string comment;
     uint256 timestamp;
     bool deleted;
-  }
-
-  struct Auction {
-    uint256 carId;
-    uint256 startingPrice;
-    uint256 currentHighestBid;
-    address highestBidder;
-    uint256 endTime;
-    bool active;
   }
 
   struct CarBasicDetails {
@@ -153,22 +104,36 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     string[] features;
   }
 
-  // Constructor
+  event CarListed(uint256 indexed carId, address indexed seller, uint256 price);
+  event CarSold(
+    uint256 indexed carId,
+    address indexed seller,
+    address indexed buyer,
+    uint256 price
+  );
+  event CarUpdated(uint256 indexed carId, address indexed owner);
+  event CarDeleted(uint256 indexed carId, address indexed owner);
+  event ReviewAdded(uint256 indexed carId, uint256 indexed reviewId, address indexed reviewer);
+  event ReviewDeleted(uint256 indexed carId, uint256 indexed reviewId);
+
   constructor() ERC721('HemDealer', 'HDM') {
     require(msg.sender != address(0), 'Invalid deployer');
   }
 
-  // Car Management Functions
   function listCar(
     CarBasicDetails calldata basicDetails,
     CarTechnicalDetails calldata technicalDetails,
     CarAdditionalInfo calldata additionalInfo,
-    SellerDetails calldata sellerDetails,
-    SaleType saleType
+    SellerDetails calldata sellerDetails
   ) public nonReentrant {
-    require(msg.sender == sellerDetails.wallet && sellerDetails.wallet != address(0), 'Invalid seller');
+    require(
+      msg.sender == sellerDetails.wallet && sellerDetails.wallet != address(0),
+      'Invalid seller'
+    );
     require(technicalDetails.price > 0, 'Invalid price');
     require(basicDetails.images.length > 0, 'No images');
+    require(basicDetails.year <= block.timestamp / 365 days + 1970, 'Invalid year');
+    require(technicalDetails.mileage < 1_000_000_000, 'Invalid mileage');
 
     _totalCars.increment();
     uint256 newCarId = _totalCars.current();
@@ -194,12 +159,11 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
       new ReviewStruct[](0),
       sellerDetails,
       false,
-      false,
-      saleType
+      false
     );
 
     _safeMint(msg.sender, newCarId);
-    emit CarListed(newCarId, msg.sender, technicalDetails.price, basicDetails.make, basicDetails.model, basicDetails.year);
+    emit CarListed(newCarId, msg.sender, technicalDetails.price);
   }
 
   modifier onlyCarOwner(uint256 carId) {
@@ -218,8 +182,7 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     CarBasicDetails memory basicDetails,
     CarTechnicalDetails memory technicalDetails,
     CarAdditionalInfo memory additionalInfo,
-    SellerDetails memory sellerDetails,
-    SaleType saleType
+    SellerDetails memory sellerDetails
   ) public nonReentrant onlyCarOwner(newCarId) {
     require(technicalDetails.price > 0, 'Price must be greater than 0');
     require(bytes(basicDetails.name).length > 0, 'Name cannot be empty');
@@ -231,39 +194,36 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     require(msg.sender == sellerDetails.wallet, 'Seller wallet must match sender');
 
     cars[newCarId] = CarStruct(
-        newCarId,
-        msg.sender,
-        basicDetails.name,
-        basicDetails.images,
-        basicDetails.description,
-        basicDetails.make,
-        basicDetails.model,
-        basicDetails.year,
-        basicDetails.vin,
-        technicalDetails.mileage,
-        technicalDetails.color,
-        technicalDetails.condition,
-        technicalDetails.transmission,
-        technicalDetails.fuelType,
-        technicalDetails.price,
-        additionalInfo.location,
-        additionalInfo.features,
-        cars[newCarId].reviews, // Preserve existing reviews
-        sellerDetails,
-        cars[newCarId].sold,    // Preserve sold status
-        false,                  // Not deleted
-        saleType
+      newCarId,
+      msg.sender,
+      basicDetails.name,
+      basicDetails.images,
+      basicDetails.description,
+      basicDetails.make,
+      basicDetails.model,
+      basicDetails.year,
+      basicDetails.vin,
+      technicalDetails.mileage,
+      technicalDetails.color,
+      technicalDetails.condition,
+      technicalDetails.transmission,
+      technicalDetails.fuelType,
+      technicalDetails.price,
+      additionalInfo.location,
+      additionalInfo.features,
+      cars[newCarId].reviews,
+      sellerDetails,
+      cars[newCarId].sold,
+      false
     );
-
-    emit CarUpdated(newCarId, msg.sender, technicalDetails.price, basicDetails.make, basicDetails.model);
+    emit CarUpdated(newCarId, msg.sender);
   }
 
   function deleteCar(uint256 newCarId) public nonReentrant onlyCarOwner(newCarId) {
     require(!cars[newCarId].deleted, 'Car already deleted');
-    require(!carAuctions[newCarId].active, 'Cannot delete car during active auction');
     cars[newCarId].deleted = true;
     _burn(newCarId);
-    emit CarDeleted(newCarId);
+    emit CarDeleted(newCarId, msg.sender);
   }
 
   // View Functions
@@ -317,7 +277,6 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     SalesStruct[] memory Sales = new SalesStruct[](totalSalesCount);
     uint256 index = 0;
 
-    // Flatten sales data into a single array
     for (uint256 i = 1; i <= _totalCars.current(); i++) {
       for (uint256 j = 0; j < sales[i].length; j++) {
         Sales[index] = sales[i][j];
@@ -327,23 +286,27 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     return Sales;
   }
 
-  // Transaction Functions
   function buyCar(uint256 carId) public payable nonReentrant carExists(carId) {
     require(!cars[carId].sold && msg.sender != cars[carId].owner, 'Invalid purchase');
     require(msg.value == cars[carId].price, 'Incorrect payment');
-    require(cars[carId].saleType == SaleType.FixedPrice, 'Not for sale');
 
     address seller = cars[carId].owner;
+    uint256 payment = msg.value;
+
     cars[carId].sold = true;
     cars[carId].owner = msg.sender;
-    
+
+    _totalSales.increment();
+    sales[carId].push(
+      SalesStruct({ id: _totalSales.current(), newCarId: carId, price: payment, owner: msg.sender })
+    );
+
     _transfer(seller, msg.sender, carId);
-    payTo(seller, msg.value);
-    
-    emit CarSold(carId, seller, msg.sender, msg.value);
+    payTo(seller, payment);
+
+    emit CarSold(carId, seller, msg.sender, payment);
   }
 
-  // Review Functions
   function createReview(uint256 newCarId, string memory comment) public {
     require(bytes(comment).length > 0, 'Comment cannot be empty');
     require(!cars[newCarId].deleted, 'Car has been deleted from listing');
@@ -367,7 +330,6 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     require(cars[newCarId].owner != address(0), 'Car does not exist');
     require(!cars[newCarId].deleted, 'Car has been deleted');
 
-    // Find the review in the car's reviews array
     bool found = false;
     uint256 reviewIndex;
     for (uint256 i = 0; i < cars[newCarId].reviews.length; i++) {
@@ -411,132 +373,9 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     return reviewsList;
   }
 
-  // Internal Functions
   function payTo(address to, uint256 price) internal {
+    require(to != address(0), 'Cannot pay to zero address');
     (bool success, ) = payable(to).call{ value: price }('');
     require(success, 'Transfer failed');
-  }
-
-  function startAuction(
-    uint256 carId,
-    uint256 startingPrice,
-    uint256 durationInDays
-  ) public {
-    require(msg.sender == cars[carId].owner, "Only owner can start auction");
-    require(!cars[carId].sold, "Car already sold");
-    require(!cars[carId].deleted, "Car has been deleted");
-    require(cars[carId].saleType == SaleType.Auction, "Car not listed for auction");
-    require(durationInDays > 0 && durationInDays <= 30, "Invalid auction duration");
-    require(startingPrice > 0, "Starting price must be greater than 0");
-    require(carAuctions[carId].active == false, "Auction already active");
-    require(cars[carId].price >= startingPrice, "Starting price cannot be higher than listing price");
-    
-    carAuctions[carId] = Auction({
-        carId: carId,
-        startingPrice: startingPrice,
-        currentHighestBid: startingPrice,
-        highestBidder: address(0),
-        endTime: block.timestamp + (durationInDays * 1 days),
-        active: true
-    });
-
-    emit AuctionStarted(carId, startingPrice, carAuctions[carId].endTime);
-  }
-
-  function placeBid(uint256 carId) public payable {
-    require(!cars[carId].deleted, "Car has been deleted");
-    require(cars[carId].saleType == SaleType.Auction, "Car not listed for auction");
-    
-    Auction storage auction = carAuctions[carId];
-    require(auction.active, "Auction not active");
-    require(block.timestamp < auction.endTime, "Auction ended");
-    require(msg.value > auction.currentHighestBid, "Bid too low");
-    require(msg.sender != cars[carId].owner, "Owner cannot bid");
-    
-    // Store old bidder and amount before updating state
-    address previousBidder = auction.highestBidder;
-    uint256 previousBid = auction.currentHighestBid;
-    
-    // Update state first
-    auction.currentHighestBid = msg.value;
-    auction.highestBidder = msg.sender;
-    
-    // Return funds after state update
-    if (previousBidder != address(0)) {
-        payTo(previousBidder, previousBid);
-    }
-    
-    emit BidPlaced(carId, msg.sender, msg.value);
-  }
-
-  function endAuction(uint256 carId) public {
-    require(msg.sender == cars[carId].owner || msg.sender == owner(), "Only owner can end auction");
-    Auction storage auction = carAuctions[carId];
-    require(auction.active, "Auction not active");
-    require(block.timestamp >= auction.endTime, "Auction still in progress");
-    
-    auction.active = false;
-    
-    if (auction.highestBidder != address(0)) {
-        _processPurchase(carId, auction.currentHighestBid);
-    }
-    
-    emit AuctionEnded(carId, auction.highestBidder, auction.currentHighestBid);
-  }
-
-  function _processPurchase(uint256 newCarId, uint256 payment) internal {
-    require(payment > 0, "Payment must be greater than 0");
-    require(!cars[newCarId].sold, "Car already sold");
-    require(cars[newCarId].owner != address(0), "Car does not exist");
-    
-    address oldOwner = cars[newCarId].owner;
-
-    // Update state before external calls
-    cars[newCarId].sold = true;
-    cars[newCarId].owner = msg.sender;
-    _transfer(oldOwner, msg.sender, newCarId);
-
-    // Record the sale
-    SalesStruct memory sale = SalesStruct({
-        id: _totalSales.current(),
-        newCarId: newCarId,
-        price: payment,
-        owner: msg.sender
-    });
-
-    sales[newCarId].push(sale);
-    _totalSales.increment();
-
-    // Process payment
-    payTo(oldOwner, payment);
-
-    emit CarSold(newCarId, oldOwner, msg.sender, payment);
-  }
-
-  function cancelAuction(uint256 carId) public {
-    require(msg.sender == cars[carId].owner || msg.sender == owner(), "Only owner can cancel auction");
-    Auction storage auction = carAuctions[carId];
-    require(auction.active, "Auction not active");
-    require(auction.highestBidder == address(0), "Cannot cancel auction with bids");
-    
-    auction.active = false;
-    emit AuctionEnded(carId, address(0), 0);
-  }
-
-  function getAuctionDetails(uint256 carId) public view returns (
-    uint256 startingPrice,
-    uint256 currentBid,
-    address highestBidder,
-    uint256 endTime,
-    bool active
-  ) {
-    Auction memory auction = carAuctions[carId];
-    return (
-      auction.startingPrice,
-      auction.currentHighestBid,
-      auction.highestBidder,
-      auction.endTime,
-      auction.active
-    );
   }
 }

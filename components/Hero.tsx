@@ -84,6 +84,7 @@ const Hero = () => {
       </div>
     </div>
   )
+  
 }
 
 const features = [

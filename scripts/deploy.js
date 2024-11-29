@@ -2,61 +2,73 @@ require('dotenv').config()
 const { ethers } = require('hardhat')
 
 async function main() {
-  console.log('Starting deployment Process')
+  console.log('Starting deployment process...')
   try {
     const [deployer] = await ethers.getSigners()
-    console.log('Deploying contract with the account:', deployer.address)
+    console.log('Deploying contracts with account:', deployer.address)
     console.log('Account balance:', (await ethers.provider.getBalance(deployer.address)).toString())
 
+    // Deploy HemDealer first
     const HemDealer = await ethers.getContractFactory('HemDealer')
-    console.log('Deploying HemDealer Contract')
-    const hemDealer = await HemDealer.deploy()
+    console.log('Deploying HemDealer Contract...')
+    const hemDealer = await HemDealer.deploy('HemDealer', 'HEMD') // Add constructor arguments
     await hemDealer.waitForDeployment()
+    const hemDealerAddress = await hemDealer.getAddress()
+    console.log('HemDealer Contract deployed to:', hemDealerAddress)
 
-    console.log('HemDealer Contract deployed to:', await hemDealer.getAddress())
+    // Get the Across Router address from environment variables
+    const acrossRouterAddress = process.env.ACROSS_ROUTER_ADDRESS
+    if (!acrossRouterAddress) {
+      throw new Error('ACROSS_ROUTER_ADDRESS not found in environment variables')
+    }
 
+    // Deploy HemDealerCrossChain
+    const HemDealerCrossChain = await ethers.getContractFactory('HemDealerCrossChain')
+    console.log('Deploying HemDealerCrossChain Contract...')
+    const hemDealerCrossChain = await HemDealerCrossChain.deploy(
+      hemDealerAddress,
+      acrossRouterAddress
+    )
+    await hemDealerCrossChain.waitForDeployment()
+    const hemDealerCrossChainAddress = await hemDealerCrossChain.getAddress()
+    console.log('HemDealerCrossChain Contract deployed to:', hemDealerCrossChainAddress)
+
+    // Set the cross-chain handler in HemDealer
+    console.log('Setting CrossChainHandler in HemDealer...')
+    const setCrossChainTx = await hemDealer.setCrossChainHandler(hemDealerCrossChainAddress)
+    await setCrossChainTx.wait()
+    console.log('CrossChainHandler set successfully')
+
+    // Save contract addresses
     const fs = require('fs')
     const contractsDir = __dirname + '/../contracts'
 
     if (!fs.existsSync(contractsDir)) {
-      fs.mkdirSync(contractsDir)
+      fs.mkdirSync(contractsDir, { recursive: true })
     }
 
     fs.writeFileSync(
-      contractsDir + '/contractAddress.json',
-      JSON.stringify({ HemDealer: await hemDealer.getAddress() }, undefined, 2)
+      contractsDir + '/contractAddresses.json',
+      JSON.stringify(
+        {
+          HemDealer: hemDealerAddress,
+          HemDealerCrossChain: hemDealerCrossChainAddress,
+          AcrossRouter: acrossRouterAddress,
+        },
+        undefined,
+        2
+      )
     )
-    console.log('Contract address saved to contractAddress.json')
-
-    if (process.env.ETHERSCAN_API_KEY) {
-      console.log('Waiting for block confirmations...')
-      await hemDealer.deployTransaction.wait(6)
-      await verify(hemDealer.address, [])
-    }
+    console.log('Contract addresses saved to contractAddresses.json')
   } catch (error) {
-    console.log('Error in deployment process:', error)
-  }
-}
-
-async function verify(contractAddress, args) {
-  console.log('Verifying contract...')
-  try {
-    await run('verify:verify', {
-      address: contractAddress,
-      constructorArguments: args,
-    })
-  } catch (e) {
-    if (e.message.toLowerCase().includes('already verified')) {
-      console.log('Already verified!')
-    } else {
-      console.log(e)
-    }
+    console.error('Error in deployment process:', error)
+    throw error
   }
 }
 
 main()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.log(error)
+    console.error(error)
     process.exit(1)
   })

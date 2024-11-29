@@ -3,14 +3,11 @@ pragma solidity 0.8.19;
 
 import '@openzeppelin/contracts/token/ERC721/ERC721.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
-import '@openzeppelin/contracts/security/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/utils/Counters.sol';
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import './HemDealerCrossChain.sol';
 
-contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
+contract HemDealer is Ownable, ERC721 {
   using Counters for Counters.Counter;
-  using SafeERC20 for IERC20;
 
   Counters.Counter private _totalCars;
   Counters.Counter private _totalSales;
@@ -18,18 +15,7 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
   mapping(uint256 => CarStruct) private cars;
   mapping(uint256 => SalesStruct[]) private sales;
 
-  address public acrossRouter;
-  mapping(address => bool) public supportedTokens;
-  mapping(uint256 => uint256) public destinationChainIds;
-
-  mapping(uint256 => bool) public crossChainTransferPending;
-  mapping(uint256 => uint256) public sourceChainIds;
-  mapping(bytes32 => uint256) public transferHashes;
-
-  uint256 public constant MAX_SLIPPAGE = 50; // 0.5% max slippage
-  uint256 public constant TRANSFER_TIMEOUT = 24 hours;
-  mapping(uint256 => uint256) public transferInitiatedAt;
-  mapping(bytes32 => bool) public processedMessages;
+  HemDealerCrossChain public crossChainHandler;
 
   struct CarStruct {
     uint256 id;
@@ -122,33 +108,15 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
   );
   event CarUpdated(uint256 indexed carId, address indexed owner);
   event CarDeleted(uint256 indexed carId, address indexed owner);
-  event CrossChainTransferInitiated(
-    uint256 indexed carId,
-    uint256 sourceChainId,
-    uint256 destinationChainId,
-    address indexed seller,
-    address indexed buyer
-  );
-  event CrossChainTransferCompleted(
-    uint256 indexed carId,
-    uint256 destinationChainId,
-    address indexed newOwner
-  );
-  event TransferCancelled(uint256 indexed carId, address indexed owner);
+  event CrossChainHandlerSet(address indexed handler);
 
-  constructor(address _acrossRouter) ERC721('HemDealer', 'HDM') {
+  constructor(string memory name, string memory symbol) ERC721(name, symbol) {
     require(msg.sender != address(0), 'Invalid deployer');
-    require(_acrossRouter != address(0), 'Invalid router');
-    acrossRouter = _acrossRouter;
   }
 
-  function addSupportedToken(address token) external onlyOwner {
-    require(token != address(0), 'Invalid token');
-    supportedTokens[token] = true;
-  }
-
-  function removeSupportedToken(address token) external onlyOwner {
-    supportedTokens[token] = false;
+  function setCrossChainHandler(address payable _handler) external onlyOwner {
+    crossChainHandler = HemDealerCrossChain(_handler);
+    emit CrossChainHandlerSet(_handler);
   }
 
   function listCar(
@@ -158,8 +126,8 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     SellerDetails calldata sellerDetails,
     uint256 destinationChainId,
     address paymentToken
-  ) public nonReentrant {
-    require(supportedTokens[paymentToken], 'Unsupported payment token');
+  ) public {
+    require(crossChainHandler.isSupportedToken(paymentToken), 'Unsupported payment token');
     require(
       msg.sender == sellerDetails.wallet && sellerDetails.wallet != address(0),
       'Invalid seller'
@@ -198,8 +166,6 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
       0
     );
 
-    destinationChainIds[newCarId] = destinationChainId;
-
     _safeMint(msg.sender, newCarId);
     emit CarListed(newCarId, msg.sender, technicalDetails.price);
   }
@@ -221,7 +187,7 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     CarTechnicalDetails memory technicalDetails,
     CarAdditionalInfo memory additionalInfo,
     SellerDetails memory sellerDetails
-  ) public nonReentrant onlyCarOwner(newCarId) {
+  ) public {
     require(technicalDetails.price > 0, 'Price must be greater than 0');
     require(bytes(basicDetails.name).length > 0, 'Name cannot be empty');
     require(basicDetails.images.length > 0, 'At least one image is required');
@@ -259,7 +225,7 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     emit CarUpdated(newCarId, msg.sender);
   }
 
-  function deleteCar(uint256 newCarId) public nonReentrant onlyCarOwner(newCarId) {
+  function deleteCar(uint256 newCarId) public {
     require(!cars[newCarId].deleted, 'Car already deleted');
     cars[newCarId].deleted = true;
     _burn(newCarId);
@@ -326,59 +292,19 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     return Sales;
   }
 
-  function buyCar(uint256 carId) public payable nonReentrant carExists(carId) {
+  function buyCar(uint256 carId) public payable carExists(carId) {
     CarStruct storage car = cars[carId];
     require(!car.sold && msg.sender != car.owner, 'Invalid purchase');
 
-    if (car.paymentToken == address(0)) {
-      require(msg.value == car.price, 'Incorrect payment');
-
-      // Calculate minimum amount out with 0.5% max slippage
-      uint256 minAmountOut = (car.price * (10000 - MAX_SLIPPAGE)) / 10000;
-
-      // Bridge ETH to destination chain
-      (bool success, ) = acrossRouter.call{ value: msg.value }(
-        abi.encodeWithSignature(
-          'deposit(address,uint256,uint256)',
-          car.seller.wallet,
-          car.destinationChainId,
-          minAmountOut
-        )
-      );
-      require(success, 'Bridge transfer failed');
-    } else {
-      require(msg.value == 0, 'ETH not accepted');
-      IERC20 token = IERC20(car.paymentToken);
-
-      // Calculate minimum amount out with 0.5% max slippage
-      uint256 minAmountOut = (car.price * (10000 - MAX_SLIPPAGE)) / 10000;
-
-      // Transfer tokens from buyer to this contract
-      token.safeTransferFrom(msg.sender, address(this), car.price);
-
-      // Approve router to spend exact amount
-      token.safeApprove(acrossRouter, car.price);
-
-      // Bridge tokens to destination chain
-      (bool success, ) = acrossRouter.call(
-        abi.encodeWithSignature(
-          'depositERC20(address,address,uint256,uint256,uint256)',
-          car.paymentToken,
-          car.seller.wallet,
-          car.price,
-          car.destinationChainId,
-          minAmountOut
-        )
-      );
-      require(success, 'Bridge transfer failed');
-
-      // Reset approval to 0
-      token.safeApprove(acrossRouter, 0);
-    }
-
     if (car.destinationChainId != block.chainid) {
-      // Initiate cross-chain transfer if buyer is on different chain
-      initiateCrossChainTransfer(carId, car.destinationChainId);
+      // Use cross-chain handler for different chain purchases
+      crossChainHandler.bridgePayment(
+        car.paymentToken,
+        car.price,
+        car.seller.wallet,
+        car.destinationChainId
+      );
+      crossChainHandler.initiateCrossChainTransfer(carId, car.destinationChainId);
     } else {
       // Regular same-chain transfer
       car.sold = true;
@@ -403,128 +329,5 @@ contract HemDealer is Ownable, ReentrancyGuard, ERC721 {
     require(to != address(0), 'Cannot pay to zero address');
     (bool success, ) = payable(to).call{ value: price }('');
     require(success, 'Transfer failed');
-  }
-
-  function initiateCrossChainTransfer(
-    uint256 carId,
-    uint256 targetChainId
-  ) public onlyCarOwner(carId) {
-    require(!crossChainTransferPending[carId], 'Transfer already pending');
-    require(targetChainId != block.chainid, 'Same chain transfer not allowed');
-
-    CarStruct storage car = cars[carId];
-
-    // Create transfer message with nonce for uniqueness
-    bytes32 messageHash = keccak256(
-      abi.encodePacked(
-        carId,
-        car.owner,
-        block.chainid,
-        car.price,
-        car.seller.wallet,
-        car.seller.sellerName,
-        car.seller.email,
-        car.seller.phoneNumber,
-        car.seller.profileImage,
-        block.timestamp
-      )
-    );
-
-    bytes memory message = abi.encode(
-      messageHash,
-      carId,
-      car.owner,
-      block.chainid,
-      car.price,
-      car.seller
-    );
-
-    // Send message to target chain via Across router
-    (bool success, ) = acrossRouter.call(
-      abi.encodeWithSignature('sendMessage(uint256,bytes)', targetChainId, message)
-    );
-    require(success, 'Failed to initiate transfer');
-
-    // Mark transfer as pending with timestamp
-    crossChainTransferPending[carId] = true;
-    transferInitiatedAt[carId] = block.timestamp;
-    sourceChainIds[carId] = block.chainid;
-    transferHashes[messageHash] = carId;
-
-    emit CrossChainTransferInitiated(
-      carId,
-      block.chainid,
-      targetChainId,
-      car.owner,
-      car.seller.wallet
-    );
-  }
-
-  function receiveCrossChainTransfer(bytes memory message, uint256 sourceChainId) public {
-    require(msg.sender == acrossRouter, 'Only router can call');
-
-    // Decode transfer message
-    (
-      bytes32 messageHash,
-      uint256 carId,
-      address originalOwner,
-      uint256 originalChainId,
-      uint256 price,
-      SellerDetails memory seller
-    ) = abi.decode(message, (bytes32, uint256, address, uint256, uint256, SellerDetails));
-
-    // Prevent replay attacks
-    require(!processedMessages[messageHash], 'Message already processed');
-    processedMessages[messageHash] = true;
-
-    // Create new car entry on this chain
-    _totalCars.increment();
-    uint256 newCarId = _totalCars.current();
-
-    // Copy car details from message
-    cars[newCarId] = CarStruct({
-      id: newCarId,
-      owner: originalOwner,
-      name: cars[carId].name,
-      images: cars[carId].images,
-      description: cars[carId].description,
-      make: cars[carId].make,
-      model: cars[carId].model,
-      year: cars[carId].year,
-      vin: cars[carId].vin,
-      mileage: cars[carId].mileage,
-      color: cars[carId].color,
-      condition: cars[carId].condition,
-      transmission: cars[carId].transmission,
-      fuelType: cars[carId].fuelType,
-      price: price,
-      location: cars[carId].location,
-      features: cars[carId].features,
-      seller: seller,
-      sold: false,
-      deleted: false,
-      destinationChainId: block.chainid,
-      paymentToken: cars[carId].paymentToken,
-      sourceChainId: originalChainId
-    });
-
-    emit CrossChainTransferCompleted(newCarId, block.chainid, originalOwner);
-  }
-
-  function cancelTimedOutTransfer(uint256 carId) external {
-    require(crossChainTransferPending[carId], 'No pending transfer');
-    require(
-      block.timestamp > transferInitiatedAt[carId] + TRANSFER_TIMEOUT,
-      'Transfer not timed out'
-    );
-
-    CarStruct storage car = cars[carId];
-    require(msg.sender == car.owner || msg.sender == owner(), 'Not authorized');
-
-    crossChainTransferPending[carId] = false;
-    delete transferInitiatedAt[carId];
-    delete sourceChainIds[carId];
-
-    emit TransferCancelled(carId, car.owner);
   }
 }

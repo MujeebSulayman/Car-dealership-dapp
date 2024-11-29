@@ -1,7 +1,7 @@
-import { SiweMessage } from 'siwe'
-import { getCsrfToken } from 'next-auth/react'
+import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import NextAuth from 'next-auth/next'
+import { getCsrfToken } from 'next-auth/react'
+import { SiweMessage } from 'siwe'
 
 export default async function auth(req, res) {
   const providers = [
@@ -23,7 +23,7 @@ export default async function auth(req, res) {
         try {
           const siwe = new SiweMessage(JSON.parse(credentials?.message || '{}'))
           const nextAuthUrl = new URL(process.env.NEXTAUTH_URL)
-
+          
           const result = await siwe.verify({
             signature: credentials?.signature || '',
             domain: nextAuthUrl.host,
@@ -35,18 +35,21 @@ export default async function auth(req, res) {
               id: siwe.address,
             }
           }
-
           return null
-        } catch (error) {
+        } catch (e) {
           return null
         }
       },
     }),
   ]
 
-  const isDefaultSigninPage = req.method === 'GET' && req.query.nextauth.includes('signin')
+  const isDefaultSigninPage =
+    req.method === 'GET' && req.query.nextauth.includes('signin')
 
-  if (isDefaultSigninPage) providers.pop()
+  // Hide Sign-In with Ethereum from default sign page
+  if (isDefaultSigninPage) {
+    providers.pop()
+  }
 
   return await NextAuth(req, res, {
     providers,
@@ -64,3 +67,4 @@ export default async function auth(req, res) {
     },
   })
 }
+

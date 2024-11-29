@@ -1,15 +1,14 @@
-import { ToastContainer } from 'react-toastify'
+import Header from '@/components/Header'
 import '@/styles/global.css'
+import { Providers } from '@/services/provider'
+import { AppProps } from 'next/app'
+import { useEffect, useState } from 'react'
+import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import '@rainbow-me/rainbowkit/styles.css'
-import { useEffect, useState } from 'react'
-import { Providers } from '@/services/provider'
-import type { AppProps } from 'next/app'
-import Header from '@/components/Header'
-import { Provider } from 'react-redux'
+import { SessionProvider } from 'next-auth/react'
 
-
-export default function App({ Component, pageProps }: AppProps) {
+export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
   const [showChild, setShowChild] = useState<boolean>(false)
 
   useEffect(() => {
@@ -20,14 +19,11 @@ export default function App({ Component, pageProps }: AppProps) {
     return null
   } else {
     return (
-      <Providers>
-        <Provider>
-          <div className="min-h-screen bg-gray-100">
+      <SessionProvider session={session}>
+        <Providers>
+          <div className="bg-black min-h-screen flex flex-col text-white">
             <Header />
-            <div className="mt-10 h-20 "></div>
             <Component {...pageProps} />
-            <div className="mt-10 h-20 "></div>
-
             <ToastContainer
               position="bottom-center"
               autoClose={5000}
@@ -40,9 +36,12 @@ export default function App({ Component, pageProps }: AppProps) {
               pauseOnHover
               theme="dark"
             />
+            <footer className="text-center py-20 text-gray-400 text-sm">
+              © 2024 HemDealer. All rights reserved.
+            </footer>
           </div>
-        </Provider>
-      </Providers>
+        </Providers>
+      </SessionProvider>
     )
   }
 }

@@ -1,0 +1,19 @@
+@layer utilities {
+  .bg-gradient-blur {
+    background: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0.8) 100%
+    );
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-black text-white;
+  }
+}
+
+.glass-effect {
+  @apply bg-white/10 backdrop-blur-md;
+} 

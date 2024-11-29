@@ -1,10 +1,9 @@
-import Hero from '@/components/Hero'
 import React from 'react'
 
 const index = () => {
   return (
     <div>
-      <Hero />
+      <h1>Cars</h1>
     </div>
   )
 }

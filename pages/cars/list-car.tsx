@@ -51,7 +51,7 @@ const ListCarPage = () => {
     profileImage: '',
 
     // Chain Details
-    destinationChainId: 1, // Default to Ethereum Mainnet
+    destinationChainId: 11155111, // Default to Ethereum Sepolia
     paymentToken: '0x0000000000000000000000000000000000000000', // Default to native token
   })
 
@@ -62,20 +62,63 @@ const ListCarPage = () => {
     isLoading: true,
   })
 
-  // Add supported chains
+  // Add supported testnet chains
   const supportedChains = [
-    { id: 1, name: 'Ethereum Mainnet' },
-    { id: 137, name: 'Polygon' },
-    { id: 56, name: 'BNB Chain' },
-    { id: 42161, name: 'Arbitrum One' },
-    { id: 10, name: 'Optimism' },
-  ]
+    { id: 421614, name: 'Arbitrum Sepolia' },
+    { id: 84532, name: 'Base Sepolia' },
+    { id: 168587773, name: 'Blast Sepolia' },
+    { id: 11155111, name: 'Ethereum Sepolia' },
+    { id: 4202, name: 'Lisk Sepolia' },
+    { id: 919, name: 'Mode Testnet' },
+    { id: 11155420, name: 'Optimism Sepolia' },
+    { id: 80002, name: 'Polygon Amoy' },
+  ] as const
 
-  // Add supported tokens
+  // Add supported tokens with testnet addresses
   const supportedTokens = [
-    { address: ethers.ZeroAddress, symbol: 'Native Token' },
-    // Add other supported tokens here
-  ]
+    { address: ethers.ZeroAddress, symbol: 'Native Token', decimals: 18 },
+    // Sepolia USDC addresses for different chains
+    { 
+      address: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', // Sepolia USDC
+      symbol: 'USDC',
+      decimals: 6
+    },
+    {
+      address: '0x5fd84259d66Cd46123540766Be93DFE6D43130D7', // Sepolia USDT
+      symbol: 'USDT',
+      decimals: 6
+    }
+  ] as const
+
+  // Add a helper function to get chain-specific token addresses
+  const getTokenAddressForChain = (chainId: number, symbol: string) => {
+    // Token addresses for different testnet chains
+    const tokenAddresses: Record<number, Record<string, string>> = {
+      11155111: { // Ethereum Sepolia
+        USDC: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+        USDT: '0x5fd84259d66Cd46123540766Be93DFE6D43130D7'
+      },
+      421614: { // Arbitrum Sepolia
+        USDC: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
+        USDT: '0x5D3c1939387748B4E8750CDf244B0D6750C489c6'
+      },
+      84532: { // Base Sepolia
+        USDC: '0x036CbD53842c5426634e7929541eC2318f3dCF7c',
+        USDT: '0x4A3A6Dd60A34bB2Aba60D73B4C88315E9CeB6A3D'
+      },
+      11155420: { // Optimism Sepolia
+        USDC: '0x5fd84259d66Cd46123540766Be93DFE6D43130D7',
+        USDT: '0x5fd84259d66Cd46123540766Be93DFE6D43130D7'
+      },
+      80002: { // Polygon Amoy
+        USDC: '0x9999f7Fea5938fD3b1E26A12c3f2fb024e194f97',
+        USDT: '0x7e752bC77eBE2225B327e6ebA2fF5224F2046669'
+      }
+
+    }
+
+    return tokenAddresses[chainId]?.[symbol] || ethers.ZeroAddress
+  }
 
   const handleAddImageUrl = (e: React.FormEvent) => {
     e.preventDefault()

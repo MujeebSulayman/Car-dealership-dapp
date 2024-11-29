@@ -277,4 +277,5 @@ export {
   bridgePayment,
   isSupportedToken,
   cancelTimedOutTransfer,
+  getEthereumContract
 }

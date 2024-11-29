@@ -18,8 +18,21 @@ const ConnectBtn: React.FC<{ networks?: boolean }> = ({ networks }) => {
   `
 
   const handleConnect = async (openConnectModal: () => void) => {
-    await openConnectModal()
-    await signIn('credentials', { redirect: false })
+    try {
+      await openConnectModal()
+    } catch (error) {
+      console.error('Connection error:', error)
+      // Add user feedback here
+    }
+  }
+
+  const handleNetworkSwitch = async (openChainModal: () => void) => {
+    try {
+      await openChainModal()
+    } catch (error) {
+      console.error('Network switch error:', error)
+      // Add user feedback here
+    }
   }
 
   return (
@@ -67,14 +80,14 @@ const ConnectBtn: React.FC<{ networks?: boolean }> = ({ networks }) => {
                 )
               }
 
-              if (chain.unsupported && networks) {
+              if (chain?.unsupported && networks) {
                 return (
                   <motion.button
                     className="bg-red-600 hover:bg-red-700 text-white
                         py-2 px-4 rounded-md
                         transition duration-300 ease-in-out
                         text-sm font-medium"
-                    onClick={openChainModal}
+                    onClick={() => handleNetworkSwitch(openChainModal)}
                     type="button"
                     variants={buttonVariants}
                     whileHover="hover"

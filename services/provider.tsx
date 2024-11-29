@@ -1,10 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import {
-  GetSiweMessageOptions,
-  RainbowKitSiweNextAuthProvider,
-} from '@rainbow-me/rainbowkit-siwe-next-auth'
 import { WagmiConfig, configureChains, createConfig } from 'wagmi'
 import { RainbowKitProvider, connectorsForWallets, darkTheme } from '@rainbow-me/rainbowkit'
 import {
@@ -43,12 +39,8 @@ const wagmiConfig = createConfig({
 })
 
 const demoAppInfo = {
-  appName: 'HemDealer',
+  appName: 'HemProp',
 }
-
-const getSiweMessageOptions: GetSiweMessageOptions = () => ({
-  statement: `Sign in to HemDealer`,
-})
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = React.useState(false)
@@ -56,11 +48,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <WagmiConfig config={wagmiConfig}>
-      <RainbowKitSiweNextAuthProvider getSiweMessageOptions={getSiweMessageOptions}>
-        <RainbowKitProvider theme={darkTheme()} chains={chains} appInfo={demoAppInfo}>
-          {mounted && children}
-        </RainbowKitProvider>
-      </RainbowKitSiweNextAuthProvider>
+      <RainbowKitProvider theme={darkTheme()} chains={chains} appInfo={demoAppInfo}>
+        {mounted && children}
+      </RainbowKitProvider>
     </WagmiConfig>
   )
 }

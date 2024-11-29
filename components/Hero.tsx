@@ -75,8 +75,8 @@ const Hero = () => {
                 className="backdrop-blur-lg bg-white/5 rounded-xl p-6 sm:p-8 border border-white/10 hover:border-blue-500/30 transition-all duration-300"
               >
                 <feature.icon className="h-6 w-6 sm:h-10 sm:w-10 text-blue-400 mx-auto mb-4 sm:mb-6" />
-                <h3 className="text-sm sm:text-lg font-semibold mb-2 sm:mb-3 text-white">{feature.title}</h3>
-                <p className="text-xs sm:text-sm leading-relaxed text-gray-400">{feature.description}</p>
+                <h3 className="text-md sm:text-lg font-semibold mb-2 sm:mb-3 text-white">{feature.title}</h3>
+                <p className="text-sm sm:text-sm leading-relaxed text-gray-400">{feature.description}</p>
               </motion.div>
             ))}
           </div>

@@ -28,25 +28,23 @@ const Hero = () => {
           transition={{ duration: 1, ease: "easeOut" }}
           className="max-w-7xl mx-auto text-center"
         >
-          {/* Updated heading with larger, more dynamic font sizes */}
+          {/* Updated heading with adjusted mobile font sizes */}
           <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-4 sm:mb-6 tracking-tight">
             Discover & Trade Cars
-            <span className="block text-blue-400 mt-2 sm:mt-3 text-4xl sm:text-5xl md:text-6xl lg:text-7xl bg-gradient-to-r from-blue-500 to-blue-400 text-transparent bg-clip-text">
+            <span className="block text-blue-400 mt-2 sm:mt-3 text-3xl sm:text-5xl md:text-6xl lg:text-7xl bg-gradient-to-r from-blue-500 to-blue-400 text-transparent bg-clip-text">
               Across Blockchains
             </span>
           </h1>
           
-          {/* Updated paragraph with larger base font size */}
+         
           <p className="text-md sm:text-xl text-gray-300/90 mb-10 sm:mb-14 max-w-2xl mx-auto leading-relaxed px-4 sm:px-0">
             The first decentralized marketplace for buying and selling vehicles across multiple blockchain networks.
             Secure, transparent, and borderless.
           </p>
 
-          {/* Updated button container for better mobile layout */}
+         
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-5 justify-center mb-16 sm:mb-20 px-4 sm:px-0">
-            {!address ? (
-              <ConnectButton />
-            ) : (
+           
               <>
                 <Link
                   href="/marketplace"
@@ -63,10 +61,10 @@ const Hero = () => {
                   List Your Car
                 </Link>
               </>
-            )}
+            
           </div>
 
-          {/* Updated feature cards grid and spacing */}
+          {/* Updated feature cards with adjusted mobile font sizes */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8 max-w-5xl mx-auto px-4 sm:px-6">
             {features.map((feature, index) => (
               <motion.div
@@ -76,9 +74,9 @@ const Hero = () => {
                 transition={{ duration: 0.6, delay: 0.3 * index }}
                 className="backdrop-blur-lg bg-white/5 rounded-xl p-6 sm:p-8 border border-white/10 hover:border-blue-500/30 transition-all duration-300"
               >
-                <feature.icon className="h-8 w-8 sm:h-10 sm:w-10 text-blue-400 mx-auto mb-4 sm:mb-6" />
-                <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 text-white">{feature.title}</h3>
-                <p className="text-gray-400 text-xs sm:text-sm leading-relaxed">{feature.description}</p>
+                <feature.icon className="h-6 w-6 sm:h-10 sm:w-10 text-blue-400 mx-auto mb-4 sm:mb-6" />
+                <h3 className="text-sm sm:text-lg font-semibold mb-2 sm:mb-3 text-white">{feature.title}</h3>
+                <p className="text-xs sm:text-sm leading-relaxed text-gray-400">{feature.description}</p>
               </motion.div>
             ))}
           </div>

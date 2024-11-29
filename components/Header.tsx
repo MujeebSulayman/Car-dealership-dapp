@@ -26,7 +26,7 @@ const Header: React.FC = () => {
     { href: '/about', label: 'About Us' },
     ...(address
       ? [
-          { href: '/sell-car', label: 'Sell Your Car' },
+          { href: '/cars/list-car', label: 'Sell Your Car' },
           { href: '/dashboard', label: 'My Dashboard' },
         ]
       : []),
@@ -51,18 +51,18 @@ const Header: React.FC = () => {
                 transition={{ duration: 0.5 }}
                 className="flex items-center"
               >
-                <FaCar className="h-6 w-6 text-blue-500" />
+                <FaCar className="h-6 w-6 text-purple-600" />
                 <span className="ml-2">HemDealer</span>
               </motion.div>
             </Link>
           </div>
-          
+
           <div className="-mr-2 -my-2 md:hidden">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setIsOpen(!isOpen)}
-              className="bg-gray-800 rounded-md p-2 inline-flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+              className="bg-gray-800 rounded-md p-2 inline-flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-600"
             >
               <span className="sr-only">Open menu</span>
               <CgMenuLeft className="h-6 w-6" aria-hidden="true" />
@@ -97,7 +97,7 @@ const Header: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <Link href={'/'} className="text-xl font-bold text-white flex items-center">
-                      <FaCar className="h-6 w-6 text-blue-500 mr-2" />
+                      <FaCar className="h-6 w-6 text-purple-600 mr-2" />
                       HemDealer
                     </Link>
                   </div>
@@ -106,7 +106,7 @@ const Header: React.FC = () => {
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => setIsOpen(!isOpen)}
-                      className="bg-gray-800 rounded-md p-2 inline-flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                      className="bg-gray-800 rounded-md p-2 inline-flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-500"
                     >
                       <span className="sr-only">Close menu</span>
                       <FaTimes className="h-6 w-6" aria-hidden="true" />
@@ -116,7 +116,12 @@ const Header: React.FC = () => {
                 <div className="mt-6">
                   <nav className="grid gap-y-8">
                     {navLinks.map((link) => (
-                      <NavLink key={link.href} href={link.href} mobile onClick={() => setIsOpen(false)}>
+                      <NavLink
+                        key={link.href}
+                        href={link.href}
+                        mobile
+                        onClick={() => setIsOpen(false)}
+                      >
                         {link.label}
                       </NavLink>
                     ))}

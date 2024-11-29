@@ -1,12 +1,14 @@
 import Hero from '@/components/Hero'
+import Makers from '@/components/Makers'
 import React from 'react'
 
-const index = () => {
+const HomePage = () => {
   return (
-    <div>
+    <main className="min-h-screen">
       <Hero />
-    </div>
+      <Makers/>
+    </main>
   )
 }
 
-export default index
+export default HomePage

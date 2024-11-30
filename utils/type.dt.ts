@@ -40,7 +40,7 @@ export interface CarTechnicalDetails {
   condition: CarCondition
   transmission: CarTransmission
   fuelType: FuelType
-  price: number
+  price: bigint
 }
 
 export interface CarAdditionalInfo {

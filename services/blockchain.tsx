@@ -50,10 +50,20 @@ const getCrossChainContract = async () => {
 
 const listCar = async (car: CarParams): Promise<void> => {
   if (!ethereum) {
-    reportError('Please install a wallet provider')
+    console.error('Please install a wallet provider')
     return Promise.reject(new Error('Browser provider not found'))
   }
   try {
+    // Check if token is supported before proceeding
+    const isSupported = await isSupportedToken(car.paymentToken)
+
+    if (!isSupported) {
+      console.error('Payment token not supported:', car.paymentToken)
+      return Promise.reject(new Error('Unsupported payment token'))
+    }
+
+    console.log('Token support verified, proceeding with listing')
+
     const contract = await getEthereumContract()
 
     tx = await contract.listCar(
@@ -62,13 +72,20 @@ const listCar = async (car: CarParams): Promise<void> => {
       car.additionalInfo,
       car.sellerDetails,
       car.destinationChainId,
-      car.paymentToken
+      car.paymentToken,
+      { gasLimit: 3000000 }
     )
 
+    console.log('Transaction sent:', tx.hash)
     await tx.wait()
     return Promise.resolve(tx)
-  } catch (error) {
-    reportError(error)
+  } catch (error: any) {
+    console.error('Contract call failed:', {
+      error,
+      message: error.message,
+      data: error.data,
+      args: error.errorArgs,
+    })
     return Promise.reject(error)
   }
 }
@@ -238,12 +255,26 @@ const bridgePayment = async (
 
 const isSupportedToken = async (token: string): Promise<boolean> => {
   try {
-    const contract = await getCrossChainContract()
-    tx = await contract.isSupportedToken(token)
-    return Promise.resolve(tx)
+    console.log('Checking token support for:', token)
+
+    // Always allow native token (address(0))
+    if (token === ethers.ZeroAddress) {
+      console.log('Native token is always supported')
+      return true
+    }
+
+    try {
+      const contract = await getCrossChainContract()
+      const result = await contract.supportedTokens(token)
+      console.log('Token support result:', result)
+      return result
+    } catch (error) {
+      console.warn('Error checking token support, defaulting to native token only:', error)
+      return token === ethers.ZeroAddress
+    }
   } catch (error) {
-    reportError(error)
-    return Promise.reject(error)
+    console.error('Error in isSupportedToken:', error)
+    return token === ethers.ZeroAddress
   }
 }
 
@@ -277,5 +308,5 @@ export {
   bridgePayment,
   isSupportedToken,
   cancelTimedOutTransfer,
-  getEthereumContract
+  getEthereumContract,
 }

@@ -153,7 +153,7 @@ npx hardhat coverage
 
 ## Socials
 
-- [Twitter](https://x.com/TheHemjay)
+- [X (Twitter)](https://x.com/TheHemjay)
 - [GitHub](https://github.com/MujeebSulayman)
 
 ## Security Features

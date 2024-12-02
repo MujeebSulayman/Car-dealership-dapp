@@ -1,10 +1,13 @@
 # HemDealer: Cross-Chain Car Marketplace
 
+![HemDealer Hero](public/images/assets/hero-banner.png)
+
 HemDealer is a decentralized application (DApp) designed for buying, selling, and managing cars in a cross-chain environment. Built using Solidity, it leverages the Ethereum blockchain, ERC721 standards, and the Across Protocol to facilitate seamless transactions across different blockchain networks.
 
 ![Solidity](https://img.shields.io/badge/Solidity-0.8.19-blue)
 ![Ethereum](https://img.shields.io/badge/Ethereum-Enabled-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
+![Across Protocol](https://img.shields.io/badge/Across-Integrated-purple)
 
 ## Table of Contents
 - [Features](#features)
@@ -18,12 +21,51 @@ HemDealer is a decentralized application (DApp) designed for buying, selling, an
 
 ## Features
 
+### Core Features
 - **NFT Car Listings:** Tokenize vehicles as ERC721 NFTs with comprehensive metadata
 - **Cross-Chain Transfers:** Seamless vehicle transfers between different blockchain networks using Across Protocol
 - **Native Token Payments:** Support for ETH and network native tokens
 - **Secure Ownership:** ERC721-based ownership management with cross-chain verification
 - **Advanced Search:** Filter cars by make, model, year, and other attributes
 - **Event Tracking:** Comprehensive event logging for all marketplace activities
+
+### Car Management
+- **Detailed Car Profiles:** Comprehensive vehicle information including:
+  - Basic details (make, model, year, VIN)
+  - Technical specifications
+  - Multiple image support
+  - Condition assessment
+  - Price history
+- **Listing Management:** Create, update, and delete car listings
+- **Ownership History:** Track all previous owners and sales
+
+### Security Features
+- **ReentrancyGuard Protection:** Prevent reentrancy attacks
+- **Cross-Chain Verification:** Secure message verification via Across Protocol
+- **Slippage Protection:** Maximum 0.5% slippage tolerance
+- **Transfer Timeout:** 24-hour safety window for cross-chain transfers
+- **Access Controls:** Role-based permissions system
+- **Payment Validation:** Automatic payment verification and processing
+
+### Seller Features
+- **Seller Profiles:** Detailed seller information and history
+- **Multiple Listings:** Manage multiple car listings
+- **Sales Analytics:** Track listing performance and sales history
+- **Cross-Chain Management:** List cars on multiple chains
+
+### Buyer Features
+- **Secure Payments:** Protected native token transactions
+- **Cross-Chain Shopping:** Browse and buy cars across different networks
+- **Purchase History:** Track all vehicle purchases
+- **Transfer Tracking:** Real-time cross-chain transfer status
+
+### Technical Features
+- **Gas Optimization:** Efficient contract design for lower transaction costs
+- **Event Logging:** Comprehensive event emission for frontend tracking
+- **Upgradeable Design:** Modular contract architecture
+- **Bridge Integration:** Seamless Across Protocol integration
+- **Batch Operations:** Support for multiple car operations
+- **Emergency Controls:** Admin functions for emergency situations
 
 ## Architecture
 

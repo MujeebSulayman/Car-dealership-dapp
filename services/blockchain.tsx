@@ -210,28 +210,73 @@ const buyCar = async (carId: number): Promise<void> => {
   }
 }
 
+const getAcrossQuote = async (
+  amount: number,
+  destinationChainId: number
+): Promise<{ relayerFeePct: number; quoteTimestamp: number }> => {
+  try {
+    // Call Across API to get quote
+    const response = await fetch('https://across-v2-api.herokuapp.com/quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: toWei(amount).toString(),
+        originToken: ethers.ZeroAddress,
+        destinationChainId: destinationChainId,
+        originChainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID || '11155111'),
+        destinationToken: ethers.ZeroAddress,
+        receiveNativeToken: true
+      })
+    });
+    
+    const quote = await response.json();
+    return {
+      relayerFeePct: quote.relayerFeePct,
+      quoteTimestamp: Math.floor(Date.now() / 1000)
+    };
+  } catch (error) {
+    console.error('Error getting Across quote:', error);
+    throw error;
+  }
+};
+
 const initiateCrossChainTransfer = async (carId: number, targetChainId: number): Promise<void> => {
   if (!ethereum) {
-    reportError('Please install a wallet provider')
-    return Promise.reject(new Error('Browser provider not found'))
+    reportError('Please install a wallet provider');
+    return Promise.reject(new Error('Browser provider not found'));
   }
 
   try {
-    const contract = await getCrossChainContract()
-    tx = await contract.initiateCrossChainTransfer(carId, targetChainId)
-    await tx.wait()
-    return Promise.resolve(tx)
+    const contract = await getCrossChainContract();
+    const car = await getCar(carId);
+    
+    // Get quote from Across
+    const quote = await getAcrossQuote(Number(ethers.formatEther(car.price)), targetChainId);
+    
+    // Calculate total amount including relayer fee
+    const totalAmount = Number(car.price) + (Number(car.price) * quote.relayerFeePct / 10000);
+
+    tx = await contract.initiateCrossChainTransfer(
+      carId,
+      targetChainId,
+      quote.relayerFeePct,
+      quote.quoteTimestamp,
+      { value: totalAmount }
+    );
+    
+    await tx.wait();
+    return Promise.resolve(tx);
   } catch (error) {
-    reportError(error)
-    return Promise.reject(error)
+    reportError(error);
+    return Promise.reject(error);
   }
-}
+};
 
 const bridgePayment = async (
-  token: string, // Token address (ethers.ZeroAddress for ETH)
-  amount: number, // Amount to bridge
-  recipient: string, // Seller's address
-  destinationChainId: number // Target chain ID
+  token: string,
+  amount: number,
+  recipient: string,
+  destinationChainId: number
 ): Promise<void> => {
   if (!ethereum) {
     reportError('Please install a wallet provider')
@@ -240,7 +285,6 @@ const bridgePayment = async (
 
   try {
     const contract = await getCrossChainContract()
-    // If token is ETH (ZeroAddress), send ETH value
     const value = token === ethers.ZeroAddress ? toWei(amount) : 0
     tx = await contract.bridgePayment(token, toWei(amount), recipient, destinationChainId, {
       value,
@@ -294,6 +338,16 @@ const cancelTimedOutTransfer = async (carId: number): Promise<void> => {
     return Promise.reject(error)
   }
 }
+
+const handleError = (error: any) => {
+  if (error.code === 4001) {
+    return 'Transaction rejected by user';
+  }
+  if (error.code === -32603) {
+    return 'Internal JSON-RPC error. Check gas settings';
+  }
+  return error.message || 'Unknown error occurred';
+};
 
 export {
   listCar,

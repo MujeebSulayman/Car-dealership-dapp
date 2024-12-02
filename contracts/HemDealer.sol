@@ -127,7 +127,7 @@ contract HemDealer is Ownable, ERC721 {
     uint256 destinationChainId,
     address paymentToken
   ) public {
-    require(crossChainHandler.isSupportedToken(paymentToken), 'Unsupported payment token');
+    require(paymentToken == address(0), 'Only native token supported');
     require(
       msg.sender == sellerDetails.wallet && sellerDetails.wallet != address(0),
       'Invalid seller'
@@ -292,24 +292,37 @@ contract HemDealer is Ownable, ERC721 {
     return Sales;
   }
 
-  function buyCar(uint256 carId) public payable carExists(carId) {
+  function buyCar(
+    uint256 carId,
+    uint256 relayerFeePct,
+    uint256 quoteTimestamp
+  ) public payable carExists(carId) {
     CarStruct storage car = cars[carId];
     require(!car.sold && msg.sender != car.owner, 'Invalid purchase');
+    require(msg.value >= car.price, 'Insufficient payment');
+    require(car.paymentToken == address(0), 'Only native token supported');
 
     if (car.destinationChainId != block.chainid) {
-      // Use cross-chain handler for different chain purchases
-      crossChainHandler.bridgePayment(
-        car.paymentToken,
-        car.price,
+      // Cross-chain purchase
+      crossChainHandler.bridgePayment{value: msg.value}(
+        msg.value,
         car.seller.wallet,
-        car.destinationChainId
+        car.destinationChainId,
+        relayerFeePct,
+        quoteTimestamp
       );
-      crossChainHandler.initiateCrossChainTransfer(carId, car.destinationChainId);
+      crossChainHandler.initiateCrossChainTransfer(
+        carId, 
+        car.destinationChainId,
+        relayerFeePct,
+        quoteTimestamp
+      );
     } else {
-      // Regular same-chain transfer
+      // Same-chain purchase
       car.sold = true;
       car.owner = msg.sender;
       _transfer(car.seller.wallet, msg.sender, carId);
+      payTo(car.seller.wallet, msg.value);
     }
 
     _totalSales.increment();

@@ -3,16 +3,27 @@ pragma solidity 0.8.19;
 
 import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/security/ReentrancyGuard.sol';
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import './HemDealer.sol';
 
-contract HemDealerCrossChain is Ownable, ReentrancyGuard {
-  using SafeERC20 for IERC20;
+interface IAcrossMessageVerifier {
+  function verifyMessageFromAcross(bytes32 messageHash) external view returns (bool);
+}
 
+interface ISpokePool {
+  function deposit(
+    uint32 destinationChainId,
+    address recipient,
+    address token,
+    uint256 amount,
+    uint256 relayerFeePct,
+    uint256 quoteTimestamp,
+    bytes memory message
+  ) external payable;
+}
+
+contract HemDealerCrossChain is Ownable, ReentrancyGuard {
   HemDealer public hemDealer;
   address public acrossRouter;
-  mapping(address => bool) public supportedTokens;
   mapping(uint256 => bool) public crossChainTransferPending;
   mapping(uint256 => uint256) public sourceChainIds;
   mapping(bytes32 => uint256) public transferHashes;
@@ -21,6 +32,8 @@ contract HemDealerCrossChain is Ownable, ReentrancyGuard {
   uint256 public constant MAX_SLIPPAGE = 50; // 0.5% max slippage
   uint256 public constant TRANSFER_TIMEOUT = 24 hours;
   mapping(uint256 => uint256) public transferInitiatedAt;
+
+  ISpokePool public immutable spokePool;
 
   event CrossChainTransferInitiated(
     uint256 indexed carId,
@@ -36,54 +49,32 @@ contract HemDealerCrossChain is Ownable, ReentrancyGuard {
   );
   event TransferCancelled(uint256 indexed carId, address indexed owner);
 
-  constructor(address _hemDealer, address _acrossRouter) {
-    require(_hemDealer != address(0), 'Invalid HemDealer address');
-    require(_acrossRouter != address(0), 'Invalid router address');
+  constructor(address _hemDealer, address _spokePool, address _acrossRouter) {
+    require(_spokePool != address(0), 'Invalid SpokePool');
+    require(_acrossRouter != address(0), 'Invalid Across Router');
+    spokePool = ISpokePool(_spokePool);
     hemDealer = HemDealer(_hemDealer);
     acrossRouter = _acrossRouter;
   }
 
-  function addSupportedToken(address token) external onlyOwner {
-    require(token != address(0), 'Invalid token');
-    supportedTokens[token] = true;
+  function isSupportedToken(address token) public pure returns (bool) {
+    return token == address(0); // Only native token is supported
   }
 
-  function removeSupportedToken(address token) external onlyOwner {
-    supportedTokens[token] = false;
-  }
-
-  function isSupportedToken(address token) public view returns (bool) {
-    if (token == address(0)) {
-      return true;
-    }
-    return supportedTokens[token];
-  }
-
-  function initiateCrossChainTransfer(uint256 carId, uint256 targetChainId) public {
+  function initiateCrossChainTransfer(
+    uint256 carId,
+    uint256 targetChainId,
+    uint256 relayerFeePct,
+    uint256 quoteTimestamp
+  ) public payable {
     require(!crossChainTransferPending[carId], 'Transfer already pending');
     require(targetChainId != block.chainid, 'Same chain transfer not allowed');
 
     HemDealer.CarStruct memory car = hemDealer.getCar(carId);
     require(msg.sender == car.owner, 'Not car owner');
 
-    // Create transfer message with nonce for uniqueness
-    bytes32 messageHash = keccak256(
-      abi.encodePacked(
-        carId,
-        car.owner,
-        block.chainid,
-        car.price,
-        car.seller.wallet,
-        car.seller.sellerName,
-        car.seller.email,
-        car.seller.phoneNumber,
-        car.seller.profileImage,
-        block.timestamp
-      )
-    );
-
-    bytes memory message = abi.encode(
-      messageHash,
+    // Pack car transfer data into message for the bridge
+    bytes memory transferData = abi.encode(
       carId,
       car.owner,
       block.chainid,
@@ -91,17 +82,21 @@ contract HemDealerCrossChain is Ownable, ReentrancyGuard {
       car.seller
     );
 
-    // Send message to target chain via Across router
-    (bool success, ) = acrossRouter.call(
-      abi.encodeWithSignature('sendMessage(uint256,bytes)', targetChainId, message)
+    // Call Across Protocol's deposit function
+    spokePool.deposit{value: msg.value}(
+      uint32(targetChainId),
+      address(this),
+      address(0),
+      msg.value,
+      relayerFeePct,
+      quoteTimestamp,
+      transferData
     );
-    require(success, 'Failed to initiate transfer');
 
-    // Mark transfer as pending with timestamp
+    // Update state
     crossChainTransferPending[carId] = true;
     transferInitiatedAt[carId] = block.timestamp;
     sourceChainIds[carId] = block.chainid;
-    transferHashes[messageHash] = carId;
 
     emit CrossChainTransferInitiated(
       carId,
@@ -115,18 +110,22 @@ contract HemDealerCrossChain is Ownable, ReentrancyGuard {
   function receiveCrossChainTransfer(bytes memory message, uint256 sourceChainId) public {
     require(msg.sender == acrossRouter, 'Only router can call');
 
-    // Decode transfer message
+    // First decode just the messageHash
+    (bytes32 messageHash, ) = abi.decode(message, (bytes32, bytes));
+    require(verifyMessage(messageHash), 'Invalid message');
+    require(!processedMessages[messageHash], 'Message already processed');
+    processedMessages[messageHash] = true;
+
+    // Decode full message
     (
-      bytes32 messageHash,
+      ,
+      // skip messageHash since we already have it
       uint256 carId,
       address originalOwner,
       uint256 originalChainId,
       uint256 price,
       HemDealer.SellerDetails memory seller
     ) = abi.decode(message, (bytes32, uint256, address, uint256, uint256, HemDealer.SellerDetails));
-
-    require(!processedMessages[messageHash], 'Message already processed');
-    processedMessages[messageHash] = true;
 
     HemDealer.CarStruct memory originalCar = hemDealer.getCar(carId);
 
@@ -187,48 +186,42 @@ contract HemDealerCrossChain is Ownable, ReentrancyGuard {
   }
 
   function bridgePayment(
-    address token,
     uint256 amount,
     address recipient,
-    uint256 destinationChainId
-  ) external payable {
-    require(supportedTokens[token] || token == address(0), 'Unsupported token');
+    uint256 destinationChainId,
+    uint256 relayerFeePct,
+    uint256 quoteTimestamp
+  ) external payable nonReentrant {
+    require(msg.value == amount, 'Incorrect payment amount');
 
-    if (token == address(0)) {
-      require(msg.value == amount, 'Incorrect payment');
-      uint256 minAmountOut = (amount * (10000 - MAX_SLIPPAGE)) / 10000;
+    spokePool.deposit{value: msg.value}(
+      uint32(destinationChainId),
+      recipient,
+      address(0), // native token
+      amount,
+      relayerFeePct,
+      quoteTimestamp,
+      '' // empty message for simple payments
+    );
+  }
 
-      (bool success, ) = acrossRouter.call{ value: msg.value }(
-        abi.encodeWithSignature(
-          'deposit(address,uint256,uint256)',
-          recipient,
-          destinationChainId,
-          minAmountOut
-        )
-      );
-      require(success, 'Bridge transfer failed');
-    } else {
-      require(msg.value == 0, 'ETH not accepted');
-      IERC20 tokenContract = IERC20(token);
-      uint256 minAmountOut = (amount * (10000 - MAX_SLIPPAGE)) / 10000;
-
-      tokenContract.safeTransferFrom(msg.sender, address(this), amount);
-      tokenContract.safeApprove(acrossRouter, amount);
-
-      (bool success, ) = acrossRouter.call(
-        abi.encodeWithSignature(
-          'depositERC20(address,address,uint256,uint256,uint256)',
-          token,
-          recipient,
-          amount,
-          destinationChainId,
-          minAmountOut
-        )
-      );
-      require(success, 'Bridge transfer failed');
-      tokenContract.safeApprove(acrossRouter, 0);
-    }
+  function verifyMessage(bytes32 messageHash) internal view returns (bool) {
+    return IAcrossMessageVerifier(acrossRouter).verifyMessageFromAcross(messageHash);
   }
 
   receive() external payable {}
+
+  function isTransferTimedOut(uint256 carId) public view returns (bool) {
+    return block.timestamp > transferInitiatedAt[carId] + TRANSFER_TIMEOUT;
+  }
+
+  function validateQuote(
+    uint256 amount,
+    uint256 relayerFeePct,
+    uint256 quoteTimestamp
+  ) public view returns (bool) {
+    require(block.timestamp - quoteTimestamp <= 5 minutes, "Quote expired");
+    require(relayerFeePct <= MAX_SLIPPAGE, "Slippage too high");
+    return true;
+  }
 }

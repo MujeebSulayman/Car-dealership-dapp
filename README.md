@@ -1,34 +1,170 @@
-# HemDealer - Cross-Chain NFT Vehicle Marketplace
+# HemDealer: Cross-Chain Car Marketplace
 
-A decentralized marketplace for tokenizing and trading vehicles across multiple blockchain networks, powered by the Across Protocol for secure cross-chain transactions.
+HemDealer is a decentralized application (DApp) designed for buying, selling, and managing cars in a cross-chain environment. Built using Solidity, it leverages the Ethereum blockchain, ERC721 standards, and the Across Protocol to facilitate seamless transactions across different blockchain networks.
 
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Solidity](https://img.shields.io/badge/Solidity-0.8.19-blue)
-![OpenZeppelin](https://img.shields.io/badge/OpenZeppelin-4.x-blue)
+![Ethereum](https://img.shields.io/badge/Ethereum-Enabled-blue)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-## Overview
+## Table of Contents
+- [Features](#features)
+- [Architecture](#architecture)
+- [Smart Contracts](#smart-contracts)
+- [Setup & Installation](#setup--installation)
+- [Deployment](#deployment)
+- [Usage](#usage)
+- [Testing](#testing)
+- [Contributing](#contributing)
 
-HemDealer is a sophisticated smart contract system that enables:
-- Vehicle tokenization as NFTs (ERC721)
-- Cross-chain vehicle listings and transfers
-- Multi-token payment support
-- Secure ownership management
-- Comprehensive vehicle metadata storage
+## Features
 
-## Technical Architecture
+- **NFT Car Listings:** Tokenize vehicles as ERC721 NFTs with comprehensive metadata
+- **Cross-Chain Transfers:** Seamless vehicle transfers between different blockchain networks using Across Protocol
+- **Native Token Payments:** Support for ETH and network native tokens
+- **Secure Ownership:** ERC721-based ownership management with cross-chain verification
+- **Advanced Search:** Filter cars by make, model, year, and other attributes
+- **Event Tracking:** Comprehensive event logging for all marketplace activities
+
+## Architecture
 
 ### Core Components
 
-1. **Token Standards**
-   - ERC721 for NFT functionality
-   - ERC20 for payment tokens
-   - SafeERC20 for secure token transfers
+1. **Smart Contracts**
+   - `HemDealer.sol`: Main marketplace contract (ERC721)
+   - `HemDealerCrossChain.sol`: Cross-chain transfer handler
+   - Across Protocol integration for secure cross-chain messaging
 
-2. **Security Features**
-   - OpenZeppelin's ReentrancyGuard
-   - Ownable access control
-   - Cross-chain message verification
-   - Slippage protection (0.5% max)
-   - Transfer timeout mechanisms (24 hours)
+2. **Frontend Integration**
+   - Web3 provider integration (ethers.js)
+   - MetaMask and Rainbow Wallet support
+   - Real-time transaction tracking
+   - Responsive UI for car listings
 
-3. **Data Structures**
+## Smart Contracts
+
+### HemDealer.sol
+Primary marketplace contract handling:
+- Car listings and sales
+- Ownership management (ERC721)
+- Payment processing
+- Cross-chain coordination
+
+### HemDealerCrossChain.sol
+Manages cross-chain operations:
+- Transfer initiation and completion
+- Message verification via Across Protocol
+- Payment bridging
+- Timeout handling (24-hour safety)
+
+## Setup & Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/MujeebSulayman/Car-dealership-dapp.git
+cd Car-dealership-dapp
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Configure environment variables:
+```bash
+cp .env.example .env
+```
+
+4. Update `.env` with your configuration:
+```plaintext
+# RPC and API Keys
+NEXT_PUBLIC_RPC_URL=your_sepolia_rpc_url
+NEXT_PUBLIC_ALCHEMY_ID=your_alchemy_id
+PRIVATE_KEY=your_private_key
+
+# Across Protocol Addresses (Sepolia)
+ACROSS_ROUTER_ADDRESS=0xC499a572640B64eA1C8c194c43Bc3E19940719dC
+ACROSS_SPOKE_POOL_ADDRESS=0x7376B2F28E58a7E7103d4185daC1e2c0E272C8A9
+```
+
+## Deployment
+
+1. Deploy to Sepolia testnet:
+```bash
+npx hardhat run scripts/deploy.js --network sepolia
+```
+
+2. Verify contracts:
+```bash
+npx hardhat verify --network sepolia <CONTRACT_ADDRESS> "HemDealer" "HEMD"
+```
+
+## Usage
+
+### Listing a Car
+```typescript
+const listCar = async (car: CarParams) => {
+  const contract = await getEthereumContract()
+  await contract.listCar(
+    car.basicDetails,
+    car.technicalDetails,
+    car.additionalInfo,
+    car.sellerDetails,
+    car.destinationChainId,
+    car.paymentToken
+  )
+}
+```
+
+### Cross-Chain Transfer
+```typescript
+const transfer = async (carId: number, destinationChain: number) => {
+  // Get quote from Across Protocol
+  const quote = await getAcrossQuote(amount, destinationChain)
+  
+  const contract = await getCrossChainContract()
+  await contract.initiateCrossChainTransfer(
+    carId,
+    destinationChain,
+    quote.relayerFeePct,
+    quote.quoteTimestamp
+  )
+}
+```
+
+## Testing
+
+Run the test suite:
+```bash
+npx hardhat test
+```
+
+Generate coverage report:
+```bash
+npx hardhat coverage
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## Socials
+
+- [Twitter](https://x.com/TheHemjay)
+- [GitHub](https://github.com/MujeebSulayman)
+
+## Security Features
+
+- ReentrancyGuard implementation
+- Ownership validation
+- Cross-chain message verification
+- Slippage protection (0.5% max)
+- Transfer timeout (24 hours)
+- Comprehensive access controls
+
+## License
+
+MIT License - see LICENSE.md for details

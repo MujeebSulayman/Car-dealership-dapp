@@ -66,32 +66,44 @@ const listCar = async (car: CarParams): Promise<void> => {
       return Promise.reject(new Error('Only native token is supported'))
     }
 
-    console.log('Token support verified, proceeding with listing')
+    // Format the car data before sending to contract
+    const formattedCar = {
+      ...car,
+      basicDetails: {
+        ...car.basicDetails,
+        year: Number(car.basicDetails.year),
+        vin: car.basicDetails.vin.toString(),
+      },
+      technicalDetails: {
+        ...car.technicalDetails,
+        mileage: Number(car.technicalDetails.mileage),
+        condition: Number(car.technicalDetails.condition),
+        transmission: Number(car.technicalDetails.transmission),
+        fuelType: Number(car.technicalDetails.fuelType),
+        price: ethers.parseEther(car.technicalDetails.price.toString()),
+      },
+    }
+
+    console.log('Sending car data to blockchain:', formattedCar)
 
     const contract = await getEthereumContract()
 
-    const provider = new ethers.BrowserProvider(ethereum)
-    const network = await provider.getNetwork()
-    const currentChainId = Number(network.chainId)
-
-    if (car.destinationChainId === currentChainId) {
-      console.warn('Destination chain is same as current chain')
-    }
-
     tx = await contract.listCar(
-      car.basicDetails,
-      car.technicalDetails,
-      car.additionalInfo,
-      car.sellerDetails,
-      car.destinationChainId,
-      car.paymentToken,
+      formattedCar.basicDetails,
+      formattedCar.technicalDetails,
+      formattedCar.additionalInfo,
+      formattedCar.sellerDetails,
+      formattedCar.destinationChainId,
+      formattedCar.paymentToken,
       {
         gasLimit: 3000000,
       }
     )
 
-    console.log('Transaction sent:', tx.hash)
+    console.log('Transaction hash:', tx.hash)
+
     await tx.wait()
+    console.log('Transaction confirmed')
     return Promise.resolve(tx)
   } catch (error: any) {
     console.error('Contract call failed:', {
@@ -265,28 +277,24 @@ const getAcrossQuote = async (
   }
 }
 
-const initiateCrossChainTransfer = async (carId: number, targetChainId: number): Promise<void> => {
+const initiateCrossChainTransfer = async (
+  carId: number,
+  destinationChainId: number
+): Promise<void> => {
   if (!ethereum) {
     reportError('Please install a wallet provider')
     return Promise.reject(new Error('Browser provider not found'))
   }
 
   try {
-    const contract = await getCrossChainContract()
-    const car = await getCar(carId)
-
-    // Get quote from Across
-    const quote = await getAcrossQuote(Number(ethers.formatEther(car.price)), targetChainId)
-
-    // Calculate total amount including relayer fee
-    const totalAmount = Number(car.price) + (Number(car.price) * quote.relayerFeePct) / 10000
+    const quote = await getAcrossQuote(0, destinationChainId)
+    const contract = await getEthereumContract()
 
     tx = await contract.initiateCrossChainTransfer(
       carId,
-      targetChainId,
+      destinationChainId,
       quote.relayerFeePct,
-      quote.quoteTimestamp,
-      { value: totalAmount }
+      quote.quoteTimestamp
     )
 
     await tx.wait()

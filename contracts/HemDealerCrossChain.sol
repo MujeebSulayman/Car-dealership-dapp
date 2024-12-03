@@ -58,7 +58,7 @@ contract HemDealerCrossChain is Ownable, ReentrancyGuard {
   }
 
   function isSupportedToken(address token) public pure returns (bool) {
-    return token == address(0); // Only native token is supported
+    return token == address(0);
   }
 
   function initiateCrossChainTransfer(

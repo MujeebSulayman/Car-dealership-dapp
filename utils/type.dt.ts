@@ -33,7 +33,7 @@ export interface CarBasicDetails {
   make: string
   model: string
   year: number
-  vin: number | string
+  vin: string
 }
 
 export interface CarTechnicalDetails {
@@ -60,7 +60,7 @@ export interface CarStruct {
   make: string
   model: string
   year: number
-  vin: number | string
+  vin: string
   mileage: number
   color: string
   condition: CarCondition

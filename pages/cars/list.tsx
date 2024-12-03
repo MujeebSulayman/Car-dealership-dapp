@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/router'
 import { useAccount } from 'wagmi'
 import { motion } from 'framer-motion'
-import { FaPlus, FaTimes, FaUser, FaCamera } from 'react-icons/fa'
+import { FaPlus, FaTimes, FaUser, FaCamera, FaEthereum, FaCar } from 'react-icons/fa'
 import Image from 'next/image'
 import { CarCondition, CarTransmission, FuelType, CarParams } from '@/utils/type.dt'
 import { listCar } from '@/services/blockchain'
 import { ethers, parseEther } from 'ethers'
+import { toast } from 'react-toastify'
+import Link from 'next/link'
 
 const avatars = ['/images/avatar/Ape_Avatar.jpg', '/images/avatar/Takashi.png']
 const getRandomAvatar = () => avatars[Math.floor(Math.random() * avatars.length)]
@@ -17,7 +19,8 @@ const ListCarPage = () => {
   const [loading, setLoading] = useState(false)
   const [imageUrl, setImageUrl] = useState('')
   const [featureInput, setFeatureInput] = useState('')
-  const [error, setError] = useState('')
+  const [currentStep, setCurrentStep] = useState(1)
+  const totalSteps = 4
 
   const [formData, setFormData] = useState<CarParams>({
     basicDetails: {
@@ -101,80 +104,90 @@ const ListCarPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!address) {
+      toast.error('Please connect your wallet first')
+      return
+    }
+
     setLoading(true)
     try {
-      if (!window.ethereum) {
-        throw new Error('Please install MetaMask')
-      }
-      
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      const network = await provider.getNetwork()
-
-      // Debug log
-      console.log('Form data before conversion:', formData)
-
-      const formDataWithWei = {
+      const formDataToSubmit = {
         ...formData,
-        technicalDetails: {
-          ...formData.technicalDetails,
-          price: parseEther(formData.technicalDetails.price.toString()),
-          mileage: Number(formData.technicalDetails.mileage),
-          condition: Number(formData.technicalDetails.condition),
-          transmission: Number(formData.technicalDetails.transmission),
-          fuelType: Number(formData.technicalDetails.fuelType),
-        },
-        additionalInfo: {
-          ...formData.additionalInfo,
-          carHistory: '',
-          location: formData.additionalInfo.location || '',
-          features: formData.additionalInfo.features || [],
-        },
         basicDetails: {
           ...formData.basicDetails,
-          year: Number(formData.basicDetails.year),
           vin: formData.basicDetails.vin.toString(),
         },
-        destinationChainId: Number(network.chainId)
+        technicalDetails: {
+          ...formData.technicalDetails,
+          price: formData.technicalDetails.price.toString(),
+        }
       }
 
-      // Debug log
-      console.log('Form data after conversion:', formDataWithWei)
-
-      try {
-        const result = await listCar(formDataWithWei as CarParams)
-        console.log('Transaction result:', result)
-        router.push('/cars')
-      } catch (txError: any) {
-        console.error('Transaction error details:', {
-          error: txError,
-          message: txError.message,
-          code: txError.code,
-          data: txError.data,
-          transaction: txError.transaction
-        })
-        throw new Error(`Transaction failed: ${txError.message}`)
-      }
+      await listCar(formDataToSubmit as CarParams)
+      toast.success('Car listed successfully!')
+      router.push('/cars')
     } catch (error: any) {
       console.error('Error listing car:', error)
-      setError(error.message || 'Failed to list car')
+      toast.error(error.message || 'Error listing car')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const nextStep = () => {
+    if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1)
+    }
+  }
+
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1)
     }
   }
 
   return (
     <div className="py-20 bg-black min-h-screen">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-white mb-8">List Your Car</h1>
-        
-    
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-white">List Your Car</h1>
+            <p className="text-gray-400 mt-2">Fill in the details to list your car on the marketplace</p>
+          </div>
+          <Link
+            href="/cars"
+            className="text-purple-400 hover:text-purple-300 transition-colors"
+          >
+            Back to Cars
+          </Link>
+        </div>
+
+        <div className="mb-8">
+          <div className="flex justify-between mb-2">
+            {[1, 2, 3, 4].map((step) => (
+              <div
+                key={step}
+                className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                  step <= currentStep ? 'bg-purple-600' : 'bg-gray-700'
+                } transition-colors`}
+              >
+                <span className="text-white text-sm">{step}</span>
+              </div>
+            ))}
+          </div>
+          <div className="h-2 bg-gray-700 rounded-full">
+            <div
+              className="h-full bg-purple-600 rounded-full transition-all duration-300"
+              style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+            />
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Basic Details */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="bg-gray-800/50 rounded-xl p-6"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: currentStep === 1 ? 1 : 0, x: currentStep === 1 ? 0 : 20 }}
+            className={`${currentStep === 1 ? 'block' : 'hidden'} bg-gray-800/50 rounded-xl p-6`}
           >
             <h2 className="text-xl font-semibold text-white mb-4">Basic Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -267,7 +280,6 @@ const ListCarPage = () => {
                 />
               </div>
 
-              {/* Images Section */}
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-400 mb-2">Images</label>
                 <div className="flex items-center space-x-2 mb-2">
@@ -310,12 +322,10 @@ const ListCarPage = () => {
             </div>
           </motion.div>
 
-          {/* Technical Details */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="bg-gray-800/50 rounded-xl p-6"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: currentStep === 2 ? 1 : 0, x: currentStep === 2 ? 0 : 20 }}
+            className={`${currentStep === 2 ? 'block' : 'hidden'} bg-gray-800/50 rounded-xl p-6`}
           >
             <h2 className="text-xl font-semibold text-white mb-4">Technical Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -419,12 +429,10 @@ const ListCarPage = () => {
             </div>
           </motion.div>
 
-          {/* Additional Info */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="bg-gray-800/50 rounded-xl p-6"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: currentStep === 3 ? 1 : 0, x: currentStep === 3 ? 0 : 20 }}
+            className={`${currentStep === 3 ? 'block' : 'hidden'} bg-gray-800/50 rounded-xl p-6`}
           >
             <h2 className="text-xl font-semibold text-white mb-4">Additional Information</h2>
             <div className="space-y-6">
@@ -482,12 +490,10 @@ const ListCarPage = () => {
             </div>
           </motion.div>
 
-          {/* Seller Details */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="bg-gray-800/50 rounded-xl p-6"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: currentStep === 4 ? 1 : 0, x: currentStep === 4 ? 0 : 20 }}
+            className={`${currentStep === 4 ? 'block' : 'hidden'} bg-gray-800/50 rounded-xl p-6`}
           >
             <h2 className="text-xl font-semibold text-white mb-4">Seller Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -548,27 +554,45 @@ const ListCarPage = () => {
             </div>
           </motion.div>
 
-          {/* Submit Button */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="flex justify-end"
+            className="flex justify-between"
           >
             <button
-              type="submit"
-              disabled={loading}
-              className="bg-purple-600 px-8 py-3 rounded-lg text-white font-semibold hover:bg-purple-700 disabled:opacity-50 transition-colors"
+              type="button"
+              onClick={prevStep}
+              className={`${
+                currentStep === 1 ? 'opacity-0' : 'opacity-100'
+              } bg-gray-700 px-8 py-3 rounded-lg text-white font-semibold hover:bg-gray-600 transition-colors`}
             >
-              {loading ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white" />
-                  <span>Listing...</span>
-                </div>
-              ) : (
-                'List Vehicle'
-              )}
+              Previous
             </button>
+
+            {currentStep < totalSteps ? (
+              <button
+                type="button"
+                onClick={nextStep}
+                className="bg-purple-600 px-8 py-3 rounded-lg text-white font-semibold hover:bg-purple-700 transition-colors"
+              >
+                Next
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={loading}
+                className="bg-purple-600 px-8 py-3 rounded-lg text-white font-semibold hover:bg-purple-700 disabled:opacity-50 transition-colors"
+              >
+                {loading ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white" />
+                    <span>Listing...</span>
+                  </div>
+                ) : (
+                  'List Vehicle'
+                )}
+              </button>
+            )}
           </motion.div>
         </form>
       </div>

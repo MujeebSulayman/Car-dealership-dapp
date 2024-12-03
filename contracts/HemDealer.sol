@@ -26,7 +26,7 @@ contract HemDealer is Ownable, ERC721 {
     string make;
     string model;
     uint256 year;
-    uint256 vin;
+    string vin;
     uint256 mileage;
     string color;
     CarCondition condition;
@@ -81,7 +81,7 @@ contract HemDealer is Ownable, ERC721 {
     string make;
     string model;
     uint256 year;
-    uint256 vin;
+    string vin;
   }
 
   struct CarTechnicalDetails {

@@ -5,11 +5,16 @@ import CarList from '@/components/CarList'
 import { CarStruct } from '@/utils/type.dt'
 import { motion } from 'framer-motion'
 import { getEthereumContract } from '@/services/blockchain'
+import { FaEthereum, FaMapMarkerAlt, FaClock } from 'react-icons/fa'
+import { format } from 'date-fns'
+import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 
 const Home = () => {
   const [cars, setCars] = useState<CarStruct[]>([])
   const [loading, setLoading] = useState(true)
   const [end, setEnd] = useState<number>(6)
+  const router = useRouter()
 
   useEffect(() => {
     const loadCars = async () => {
@@ -41,23 +46,16 @@ const Home = () => {
           </p>
         </div>
 
-        {cars.length > 0 ? (
-          <>
-            <CarList cars={cars.slice(0, end)} loading={loading} />
-            {cars.length > end && (
-              <div className="flex justify-center mt-8">
-                <button
-                  onClick={() => setEnd(end + 6)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-lg transition-all duration-300 font-medium"
-                >
-                  View More Cars
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="text-center text-gray-400 text-lg">
-            {loading ? 'Finding the perfect cars for you...' : 'New vehicles coming soon. Check back later!'}
+        <CarList cars={cars.slice(0, end)} loading={loading} />
+
+        {cars.length > end && (
+          <div className="flex justify-center mt-8">
+            <button
+              onClick={() => setEnd(end + 6)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg transition-all duration-300 font-medium"
+            >
+              View More Cars
+            </button>
           </div>
         )}
       </div>

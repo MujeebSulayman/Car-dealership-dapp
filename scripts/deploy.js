@@ -1,5 +1,6 @@
 require('dotenv').config()
 const { ethers } = require('hardhat')
+const { validateAndFormatAddress } = require('./utils/validation')
 
 async function main() {
   console.log('Starting deployment process...')
@@ -8,7 +9,7 @@ async function main() {
     console.log('Deploying contracts with account:', deployer.address)
     console.log('Account balance:', (await ethers.provider.getBalance(deployer.address)).toString())
 
-    // Get Across Protocol addresses from environment
+    // Get and validate Across Protocol addresses from environment
     const acrossRouterAddress = process.env.ACROSS_ROUTER_ADDRESS
     const acrossSpokePoolAddress = process.env.ACROSS_SPOKE_POOL_ADDRESS
 
@@ -18,9 +19,9 @@ async function main() {
       )
     }
 
-    // Properly format addresses using ethers
-    const formattedRouterAddress = ethers.getAddress(acrossRouterAddress)
-    const formattedSpokePoolAddress = ethers.getAddress(acrossSpokePoolAddress)
+    // Format addresses using the validation utility
+    const formattedRouterAddress = validateAndFormatAddress(acrossRouterAddress)
+    const formattedSpokePoolAddress = validateAndFormatAddress(acrossSpokePoolAddress)
 
     // Deploy HemDealer first
     console.log('Deploying HemDealer Contract...')
@@ -47,6 +48,20 @@ async function main() {
     const setCrossChainTx = await hemDealer.setCrossChainHandler(crossChainAddress)
     await setCrossChainTx.wait()
     console.log('CrossChain handler set successfully')
+
+    // Save deployed addresses
+    const fs = require('fs')
+    const deployedAddresses = {
+      HemDealer: hemDealerAddress,
+      HemDealerCrossChain: crossChainAddress,
+      AcrossRouter: formattedRouterAddress
+    }
+
+    fs.writeFileSync(
+      './contracts/contractAddresses.json',
+      JSON.stringify(deployedAddresses, null, 2)
+    )
+    console.log('Contract addresses saved to contractAddresses.json')
 
     console.log('Deployment completed successfully')
   } catch (error) {

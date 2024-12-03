@@ -5,6 +5,7 @@ import crossChainAbi from '../artifacts/contracts/HemDealerCrossChain.sol/HemDea
 import { CarParams, CarStruct, SalesStruct } from '@/utils/type.dt'
 
 const toWei = (num: number) => ethers.parseEther(num.toString())
+const fromWei = (num: number) => ethers.formatEther(num)
 
 let ethereum: any
 let tx: any
@@ -62,9 +63,23 @@ const listCar = async (car: CarParams): Promise<void> => {
       return Promise.reject(new Error('Unsupported payment token'))
     }
 
+    // Validate that only native token is allowed as per contract requirement
+    if (car.paymentToken !== ethers.ZeroAddress) {
+      return Promise.reject(new Error('Only native token is supported'))
+    }
+
     console.log('Token support verified, proceeding with listing')
 
     const contract = await getEthereumContract()
+
+    // Validate destination chain ID - FIXED: Get provider correctly
+    const provider = new ethers.BrowserProvider(ethereum)
+    const network = await provider.getNetwork()
+    const currentChainId = Number(network.chainId)
+    
+    if (car.destinationChainId === currentChainId) {
+      console.warn('Destination chain is same as current chain')
+    }
 
     tx = await contract.listCar(
       car.basicDetails,
@@ -72,8 +87,7 @@ const listCar = async (car: CarParams): Promise<void> => {
       car.additionalInfo,
       car.sellerDetails,
       car.destinationChainId,
-      car.paymentToken,
-      { gasLimit: 3000000 }
+      car.paymentToken
     )
 
     console.log('Transaction sent:', tx.hash)
@@ -189,17 +203,32 @@ const buyCar = async (carId: number): Promise<void> => {
     // Check if cross-chain purchase is needed
     const provider = contract.runner as ethers.Provider
     const network = await provider.getNetwork()
+    
     if (car.destinationChainId !== network.chainId) {
-      const crossChainContract = await getCrossChainContract()
-      tx = await crossChainContract.bridgePayment(
-        car.paymentToken,
-        car.price,
-        car.seller.wallet,
-        car.destinationChainId,
-        { value: car.paymentToken === ethers.ZeroAddress ? car.price : 0 }
+      // Get quote for cross-chain transfer
+      const quote = await getAcrossQuote(
+        Number(ethers.formatEther(car.price)), 
+        car.destinationChainId
+      )
+
+      // Calculate total amount including relayer fee
+      const totalAmount = Number(car.price) + 
+        (Number(car.price) * quote.relayerFeePct / 10000)
+
+      tx = await contract.buyCar(
+        carId,
+        quote.relayerFeePct,
+        quote.quoteTimestamp,
+        { value: totalAmount }
       )
     } else {
-      tx = await contract.buyCar(carId, { value: car.price })
+      // Same chain purchase - pass 0 for relayerFeePct and current timestamp
+      tx = await contract.buyCar(
+        carId,
+        0, // relayerFeePct
+        Math.floor(Date.now() / 1000), // quoteTimestamp
+        { value: car.price }
+      )
     }
 
     await tx.wait()
@@ -349,6 +378,34 @@ const handleError = (error: any) => {
   return error.message || 'Unknown error occurred';
 };
 
+const validateQuote = async (
+  contract: ethers.Contract,
+  amount: number,
+  relayerFeePct: number,
+  quoteTimestamp: number
+): Promise<boolean> => {
+  try {
+    return await contract.validateQuote(
+      toWei(amount),
+      relayerFeePct,
+      quoteTimestamp
+    )
+  } catch (error) {
+    console.error('Quote validation failed:', error)
+    return false
+  }
+}
+
+const isTransferTimedOut = async (carId: number): Promise<boolean> => {
+  try {
+    const contract = await getCrossChainContract()
+    return await contract.isTransferTimedOut(carId)
+  } catch (error) {
+    console.error('Error checking transfer timeout:', error)
+    throw error
+  }
+}
+
 export {
   listCar,
   updateCar,
@@ -363,4 +420,9 @@ export {
   isSupportedToken,
   cancelTimedOutTransfer,
   getEthereumContract,
+  validateQuote,
+  isTransferTimedOut,
+  getAcrossQuote,
+  toWei,
+  fromWei
 }

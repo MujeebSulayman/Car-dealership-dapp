@@ -31,7 +31,7 @@ export interface CarBasicDetails {
   make: string
   model: string
   year: number
-  vin: number
+  vin: number | string
 }
 
 export interface CarTechnicalDetails {
@@ -40,12 +40,12 @@ export interface CarTechnicalDetails {
   condition: CarCondition
   transmission: CarTransmission
   fuelType: FuelType
-  price: bigint
+  price: number | string
 }
 
 export interface CarAdditionalInfo {
   location: string
-  carHistory: string
+  carHistory?: string
   features: string[]
 }
 
@@ -58,7 +58,7 @@ export interface CarStruct {
   make: string
   model: string
   year: number
-  vin: number
+  vin: number | string
   mileage: number
   color: string
   condition: CarCondition

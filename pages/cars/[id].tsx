@@ -20,12 +20,13 @@ import {
   FaPhone,
   FaWallet,
 } from 'react-icons/fa'
-import { getCar } from '@/services/blockchain'
+import { deleteCar, getCar, getEthereumContract } from '@/services/blockchain'
 import { CarStruct, CarCondition, CarTransmission, FuelType } from '@/utils/type.dt'
 import { useAccount, useConnect } from 'wagmi'
 import { InjectedConnector } from 'wagmi/connectors/injected'
 import Lightbox from 'react-image-lightbox'
 import 'react-image-lightbox/style.css'
+import { toast } from 'react-toastify'
 
 const CarDetailsPage = () => {
   const router = useRouter()
@@ -57,17 +58,49 @@ const CarDetailsPage = () => {
 
   const handleShare = () => {
     if (navigator.share) {
-      navigator.share({
-        title: car?.name,
-        text: `Check out this car: ${car?.name}`,
-        url: window.location.href,
-      })
-      .then(() => console.log('Successful share'))
-      .catch((error) => console.error('Error sharing:', error));
+      navigator
+        .share({
+          title: car?.name,
+          text: `Check out this car: ${car?.name}`,
+          url: window.location.href,
+        })
+        .then(() => console.log('Successful share'))
+        .catch((error) => console.error('Error sharing:', error))
     } else {
-      alert('Web Share API is not supported in your browser.');
+      alert('Web Share API is not supported in your browser.')
     }
-  };
+  }
+
+  const handleBuyCar = async () => {
+    if (!car) return
+    try {
+      const contract = await getEthereumContract()
+      const transaction = await contract.buyCar(car.id, {
+        value: car.price,
+      })
+      await transaction.wait()
+      toast.success('Car purchased successfully!')
+    } catch (error) {
+      console.error('Error purchasing car:', error)
+      toast.error('Failed to purchase car. Please try again.')
+    }
+  }
+
+  const handleDeleteCar = async () => {
+    if (!car) return
+    if (!confirm('Are you sure you want to delete this listing?')) return
+
+    try {
+      const contract = await getEthereumContract()
+      const transaction = await contract.deleteCar(car.id)
+      await transaction.wait()
+      toast.success('Car listing deleted successfully!')
+      router.push('/cars')
+    } catch (error) {
+      console.error('Error deleting car:', error)
+      toast.error('Failed to delete car listing. Please try again.')
+    }
+  }
 
   if (loading || !car) {
     return <LoadingState />
@@ -79,14 +112,14 @@ const CarDetailsPage = () => {
       <nav className="bg-gray-900/50 backdrop-blur-sm border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
-            <button 
+            <button
               onClick={() => router.back()}
               className="text-gray-400 hover:text-white transition-colors"
             >
               ← Back to Listings
             </button>
             <div className="flex items-center space-x-4">
-              <button 
+              <button
                 onClick={handleShare}
                 className="text-purple-400 hover:text-purple-300 transition-colors"
               >
@@ -114,12 +147,11 @@ const CarDetailsPage = () => {
               <span className="hidden sm:inline">•</span>
               <div className="flex items-center">
                 <FaClock className="mr-2" />
-                </div>
+              </div>
             </div>
             <div className="flex items-center text-2xl sm:text-3xl font-bold text-white">
               <FaEthereum className="mr-2 text-purple-400" />
               <span>{Number(car.price) / 10 ** 18} ETH</span>
-              
             </div>
           </div>
         </div>
@@ -174,15 +206,15 @@ const CarDetailsPage = () => {
                 onMovePrevRequest={() =>
                   setSelectedImage((selectedImage + car.images.length - 1) % car.images.length)
                 }
-                onMoveNextRequest={() =>
-                  setSelectedImage((selectedImage + 1) % car.images.length)
-                }
+                onMoveNextRequest={() => setSelectedImage((selectedImage + 1) % car.images.length)}
               />
             )}
 
             {/* Car Specifications */}
             <div className="bg-gray-800/30 rounded-xl p-4 sm:p-6 backdrop-blur-sm">
-              <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">Specifications</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">
+                Specifications
+              </h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
                 <SpecItem icon={FaCar} label="Make" value={car.make} />
                 <SpecItem icon={FaCar} label="Model" value={car.model} />
@@ -190,8 +222,16 @@ const CarDetailsPage = () => {
                 <SpecItem icon={FaTachometerAlt} label="Mileage" value={`${car.mileage} km`} />
                 <SpecItem icon={FaGasPump} label="Fuel Type" value={FuelType[car.fuelType]} />
                 <SpecItem icon={FaPaintBrush} label="Color" value={car.color} />
-                <SpecItem icon={FaCar} label="Transmission" value={CarTransmission[car.transmission]} />
-                <SpecItem icon={FaShieldAlt} label="Condition" value={CarCondition[car.condition]} />
+                <SpecItem
+                  icon={FaCar}
+                  label="Transmission"
+                  value={CarTransmission[car.transmission]}
+                />
+                <SpecItem
+                  icon={FaShieldAlt}
+                  label="Condition"
+                  value={CarCondition[car.condition]}
+                />
               </div>
             </div>
 
@@ -200,10 +240,7 @@ const CarDetailsPage = () => {
               <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">Features</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {car.features.map((feature, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center text-gray-300 space-x-2"
-                  >
+                  <div key={index} className="flex items-center text-gray-300 space-x-2">
                     <div className="w-2 h-2 bg-purple-400 rounded-full" />
                     <span>{feature}</span>
                   </div>
@@ -239,9 +276,7 @@ const CarDetailsPage = () => {
                   </div>
                 </div>
                 <div>
-                  <h4 className="text-lg font-medium text-white">
-                    {car.seller.sellerName}
-                  </h4>
+                  <h4 className="text-lg font-medium text-white">{car.seller.sellerName}</h4>
                 </div>
               </div>
               <div className="space-y-3">
@@ -284,7 +319,7 @@ const CarDetailsPage = () => {
                           Edit Listing
                         </button>
                         <button
-                          onClick={() => {}}
+                          onClick={handleDeleteCar}
                           className="w-full border border-red-500 text-red-500 py-3 rounded-lg font-semibold hover:bg-red-500/10 transition-colors"
                         >
                           Delete Listing
@@ -293,13 +328,10 @@ const CarDetailsPage = () => {
                     ) : (
                       <>
                         <button
-                          onClick={() => {}}
+                          onClick={handleBuyCar}
                           className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors"
                         >
                           Buy Now
-                        </button>
-                        <button className="w-full border border-purple-400 text-purple-400 py-3 rounded-lg font-semibold hover:bg-purple-400/10 transition-colors">
-                          Make Offer
                         </button>
                       </>
                     )}
@@ -402,4 +434,3 @@ const LoadingState = () => (
 )
 
 export default CarDetailsPage
-  

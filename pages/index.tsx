@@ -3,11 +3,8 @@ import Hero from '@/components/Hero'
 import Makers from '@/components/Makers'
 import CarList from '@/components/CarList'
 import { CarStruct } from '@/utils/type.dt'
-import { motion } from 'framer-motion'
 import { getEthereumContract } from '@/services/blockchain'
-import { FaEthereum, FaMapMarkerAlt, FaClock } from 'react-icons/fa'
-import { format } from 'date-fns'
-import Image from 'next/image'
+
 import { useRouter } from 'next/navigation'
 
 const Home = () => {
@@ -37,7 +34,7 @@ const Home = () => {
     <div className="bg-black">
       <Hero />
       <Makers />
-      
+
       <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-white mb-3">Explore Our Collection</h1>

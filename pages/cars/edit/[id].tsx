@@ -111,7 +111,7 @@ const EditCarPage = () => {
         ...formData,
         technicalDetails: {
           ...formData.technicalDetails,
-          price: ethers.parseEther(formData.technicalDetails.price.toString()),
+          price: ethers.parseEther(formData.technicalDetails.price.toString()).toString(),
         },
       }
       await updateCar(Number(id), formDataToSubmit)

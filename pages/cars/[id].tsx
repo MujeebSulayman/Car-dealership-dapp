@@ -20,13 +20,28 @@ import {
   FaPhone,
   FaWallet,
 } from 'react-icons/fa'
-import { deleteCar, getCar, getEthereumContract } from '@/services/blockchain'
+import { deleteCar, getCar, getEthereumContract, initiateCrossChainTransfer } from '@/services/blockchain'
 import { CarStruct, CarCondition, CarTransmission, FuelType } from '@/utils/type.dt'
 import { useAccount, useConnect } from 'wagmi'
 import { InjectedConnector } from 'wagmi/connectors/injected'
 import Lightbox from 'react-image-lightbox'
 import 'react-image-lightbox/style.css'
 import { toast } from 'react-toastify'
+import { ethers } from 'ethers'
+import { CrossChainTransferModal } from '@/components/CrossChainTransferModal'
+
+const formatPrice = (price: bigint | string | number): string => {
+  try {
+    if (typeof price === 'number') {
+      return price.toString()
+    }
+    const cleanPrice = price.toString().replace(' ETH', '')
+    return ethers.formatEther(cleanPrice)
+  } catch (error) {
+    console.error('Error formatting price:', error)
+    return '0'
+  }
+}
 
 const CarDetailsPage = () => {
   const router = useRouter()
@@ -39,7 +54,10 @@ const CarDetailsPage = () => {
     connector: new InjectedConnector(),
   })
   const [isOpen, setIsOpen] = useState(false)
-
+  const [isTransferring, setIsTransferring] = useState(false)
+  const [destinationChain, setDestinationChain] = useState<number>(0)
+  const [showTransferModal, setShowTransferModal] = useState(false)
+    
   useEffect(() => {
     const loadCar = async () => {
       if (!id) return
@@ -75,11 +93,17 @@ const CarDetailsPage = () => {
     if (!car) return
     try {
       const contract = await getEthereumContract()
-      const transaction = await contract.buyCar(car.id, {
-        value: car.price,
-      })
+      const transaction = await contract.buyCar(
+        car.id,
+        0, // relayerFeePct
+        Math.floor(Date.now() / 1000), // quoteTimestamp
+        {
+          value: car.price, // The price is already in wei from the contract
+        }
+      )
       await transaction.wait()
       toast.success('Car purchased successfully!')
+      router.reload()
     } catch (error) {
       console.error('Error purchasing car:', error)
       toast.error('Failed to purchase car. Please try again.')
@@ -99,6 +123,22 @@ const CarDetailsPage = () => {
     } catch (error) {
       console.error('Error deleting car:', error)
       toast.error('Failed to delete car listing. Please try again.')
+    }
+  }
+
+  const handleCrossChainTransfer = async () => {
+    if (!car) return
+    setIsTransferring(true)
+    try {
+      await initiateCrossChainTransfer(car.id, destinationChain)
+      toast.success('Cross-chain transfer initiated successfully!')
+      router.reload()
+    } catch (error) {
+      console.error('Error initiating cross-chain transfer:', error)
+      toast.error('Failed to initiate cross-chain transfer')
+    } finally {
+      setIsTransferring(false)
+      setShowTransferModal(false)
     }
   }
 
@@ -151,7 +191,7 @@ const CarDetailsPage = () => {
             </div>
             <div className="flex items-center text-2xl sm:text-3xl font-bold text-white">
               <FaEthereum className="mr-2 text-purple-400" />
-              <span>{Number(car.price) / 10 ** 18} ETH</span>
+              <span>{formatPrice(car.price)} ETH</span>
             </div>
           </div>
         </div>
@@ -360,13 +400,21 @@ const CarDetailsPage = () => {
                     Transfer this car NFT to another blockchain network using Across Protocol
                   </p>
                   <button
-                    onClick={() => {}}
+                    onClick={() => setShowTransferModal(true)}
                     className="w-full border border-purple-400 text-purple-400 py-3 rounded-lg font-semibold hover:bg-purple-400/10 transition-colors"
                   >
-                    Initialize Transfer
+                    Bridge to Another Chain
                   </button>
                 </div>
               )}
+
+              <CrossChainTransferModal
+                isOpen={showTransferModal}
+                onClose={() => setShowTransferModal(false)}
+                onTransfer={handleCrossChainTransfer}
+                isTransferring={isTransferring}
+                currentChainId={Number(process.env.NEXT_PUBLIC_CHAIN_ID)}
+              />
 
               {/* History */}
               <div className="bg-gray-800/30 rounded-xl p-6 backdrop-blur-sm">
@@ -404,7 +452,7 @@ const HistoryItem = ({ action, date, price }: { action: string; date: string; pr
     </div>
     <div className="flex items-center text-white">
       <FaEthereum className="mr-1 text-purple-400" />
-      {price}
+      {formatPrice(price)} ETH
     </div>
   </div>
 )
@@ -434,3 +482,4 @@ const LoadingState = () => (
 )
 
 export default CarDetailsPage
+

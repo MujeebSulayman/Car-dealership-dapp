@@ -55,7 +55,6 @@ const listCar = async (car: CarParams): Promise<void> => {
     return Promise.reject(new Error('Browser provider not found'))
   }
   try {
-    // Check if token is supported before proceeding
     const isSupported = await isSupportedToken(car.paymentToken)
 
     if (!isSupported) {
@@ -63,7 +62,6 @@ const listCar = async (car: CarParams): Promise<void> => {
       return Promise.reject(new Error('Unsupported payment token'))
     }
 
-    // Validate that only native token is allowed as per contract requirement
     if (car.paymentToken !== ethers.ZeroAddress) {
       return Promise.reject(new Error('Only native token is supported'))
     }
@@ -72,11 +70,10 @@ const listCar = async (car: CarParams): Promise<void> => {
 
     const contract = await getEthereumContract()
 
-    // Validate destination chain ID - FIXED: Get provider correctly
     const provider = new ethers.BrowserProvider(ethereum)
     const network = await provider.getNetwork()
     const currentChainId = Number(network.chainId)
-    
+
     if (car.destinationChainId === currentChainId) {
       console.warn('Destination chain is same as current chain')
     }
@@ -87,7 +84,10 @@ const listCar = async (car: CarParams): Promise<void> => {
       car.additionalInfo,
       car.sellerDetails,
       car.destinationChainId,
-      car.paymentToken
+      car.paymentToken,
+      {
+        gasLimit: 3000000,
+      }
     )
 
     console.log('Transaction sent:', tx.hash)
@@ -203,24 +203,20 @@ const buyCar = async (carId: number): Promise<void> => {
     // Check if cross-chain purchase is needed
     const provider = contract.runner as ethers.Provider
     const network = await provider.getNetwork()
-    
+
     if (car.destinationChainId !== network.chainId) {
       // Get quote for cross-chain transfer
       const quote = await getAcrossQuote(
-        Number(ethers.formatEther(car.price)), 
+        Number(ethers.formatEther(car.price)),
         car.destinationChainId
       )
 
       // Calculate total amount including relayer fee
-      const totalAmount = Number(car.price) + 
-        (Number(car.price) * quote.relayerFeePct / 10000)
+      const totalAmount = Number(car.price) + (Number(car.price) * quote.relayerFeePct) / 10000
 
-      tx = await contract.buyCar(
-        carId,
-        quote.relayerFeePct,
-        quote.quoteTimestamp,
-        { value: totalAmount }
-      )
+      tx = await contract.buyCar(carId, quote.relayerFeePct, quote.quoteTimestamp, {
+        value: totalAmount,
+      })
     } else {
       // Same chain purchase - pass 0 for relayerFeePct and current timestamp
       tx = await contract.buyCar(
@@ -254,36 +250,36 @@ const getAcrossQuote = async (
         destinationChainId: destinationChainId,
         originChainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID || '11155111'),
         destinationToken: ethers.ZeroAddress,
-        receiveNativeToken: true
-      })
-    });
-    
-    const quote = await response.json();
+        receiveNativeToken: true,
+      }),
+    })
+
+    const quote = await response.json()
     return {
       relayerFeePct: quote.relayerFeePct,
-      quoteTimestamp: Math.floor(Date.now() / 1000)
-    };
+      quoteTimestamp: Math.floor(Date.now() / 1000),
+    }
   } catch (error) {
-    console.error('Error getting Across quote:', error);
-    throw error;
+    console.error('Error getting Across quote:', error)
+    throw error
   }
-};
+}
 
 const initiateCrossChainTransfer = async (carId: number, targetChainId: number): Promise<void> => {
   if (!ethereum) {
-    reportError('Please install a wallet provider');
-    return Promise.reject(new Error('Browser provider not found'));
+    reportError('Please install a wallet provider')
+    return Promise.reject(new Error('Browser provider not found'))
   }
 
   try {
-    const contract = await getCrossChainContract();
-    const car = await getCar(carId);
-    
+    const contract = await getCrossChainContract()
+    const car = await getCar(carId)
+
     // Get quote from Across
-    const quote = await getAcrossQuote(Number(ethers.formatEther(car.price)), targetChainId);
-    
+    const quote = await getAcrossQuote(Number(ethers.formatEther(car.price)), targetChainId)
+
     // Calculate total amount including relayer fee
-    const totalAmount = Number(car.price) + (Number(car.price) * quote.relayerFeePct / 10000);
+    const totalAmount = Number(car.price) + (Number(car.price) * quote.relayerFeePct) / 10000
 
     tx = await contract.initiateCrossChainTransfer(
       carId,
@@ -291,15 +287,15 @@ const initiateCrossChainTransfer = async (carId: number, targetChainId: number):
       quote.relayerFeePct,
       quote.quoteTimestamp,
       { value: totalAmount }
-    );
-    
-    await tx.wait();
-    return Promise.resolve(tx);
+    )
+
+    await tx.wait()
+    return Promise.resolve(tx)
   } catch (error) {
-    reportError(error);
-    return Promise.reject(error);
+    reportError(error)
+    return Promise.reject(error)
   }
-};
+}
 
 const bridgePayment = async (
   token: string,
@@ -370,13 +366,13 @@ const cancelTimedOutTransfer = async (carId: number): Promise<void> => {
 
 const handleError = (error: any) => {
   if (error.code === 4001) {
-    return 'Transaction rejected by user';
+    return 'Transaction rejected by user'
   }
   if (error.code === -32603) {
-    return 'Internal JSON-RPC error. Check gas settings';
+    return 'Internal JSON-RPC error. Check gas settings'
   }
-  return error.message || 'Unknown error occurred';
-};
+  return error.message || 'Unknown error occurred'
+}
 
 const validateQuote = async (
   contract: ethers.Contract,
@@ -385,11 +381,7 @@ const validateQuote = async (
   quoteTimestamp: number
 ): Promise<boolean> => {
   try {
-    return await contract.validateQuote(
-      toWei(amount),
-      relayerFeePct,
-      quoteTimestamp
-    )
+    return await contract.validateQuote(toWei(amount), relayerFeePct, quoteTimestamp)
   } catch (error) {
     console.error('Quote validation failed:', error)
     return false
@@ -424,5 +416,5 @@ export {
   isTransferTimedOut,
   getAcrossQuote,
   toWei,
-  fromWei
+  fromWei,
 }

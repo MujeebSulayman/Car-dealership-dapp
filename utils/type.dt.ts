@@ -1,3 +1,5 @@
+import { BigNumberish } from 'ethers'
+
 export enum CarCondition {
   New,
   Used,
@@ -40,7 +42,7 @@ export interface CarTechnicalDetails {
   condition: CarCondition
   transmission: CarTransmission
   fuelType: FuelType
-  price: number | string
+  price: BigNumberish
 }
 
 export interface CarAdditionalInfo {
@@ -64,7 +66,7 @@ export interface CarStruct {
   condition: CarCondition
   transmission: CarTransmission
   fuelType: FuelType
-  price: number
+  price: BigNumberish
   location: string
   features: string[]
   seller: SellerDetails

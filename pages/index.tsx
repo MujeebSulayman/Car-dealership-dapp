@@ -18,8 +18,7 @@ const Home = () => {
       try {
         const contract = await getEthereumContract()
         const allCars = await contract.getAllCars()
-        const available = allCars.filter((car: CarStruct) => !car.sold)
-        setCars(available)
+        setCars(allCars)
       } catch (error) {
         console.error('Error loading cars:', error)
       } finally {

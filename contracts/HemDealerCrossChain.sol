@@ -73,17 +73,10 @@ contract HemDealerCrossChain is Ownable, ReentrancyGuard {
     HemDealer.CarStruct memory car = hemDealer.getCar(carId);
     require(msg.sender == car.owner, 'Not car owner');
 
-    // Pack car transfer data into message for the bridge
-    bytes memory transferData = abi.encode(
-      carId,
-      car.owner,
-      block.chainid,
-      car.price,
-      car.seller
-    );
+    bytes memory transferData = abi.encode(carId, car.owner, block.chainid, car.price, car.seller);
 
     // Call Across Protocol's deposit function
-    spokePool.deposit{value: msg.value}(
+    spokePool.deposit{ value: msg.value }(
       uint32(targetChainId),
       address(this),
       address(0),
@@ -93,7 +86,6 @@ contract HemDealerCrossChain is Ownable, ReentrancyGuard {
       transferData
     );
 
-    // Update state
     crossChainTransferPending[carId] = true;
     transferInitiatedAt[carId] = block.timestamp;
     sourceChainIds[carId] = block.chainid;
@@ -110,16 +102,13 @@ contract HemDealerCrossChain is Ownable, ReentrancyGuard {
   function receiveCrossChainTransfer(bytes memory message, uint256 sourceChainId) public {
     require(msg.sender == acrossRouter, 'Only router can call');
 
-    // First decode just the messageHash
     (bytes32 messageHash, ) = abi.decode(message, (bytes32, bytes));
     require(verifyMessage(messageHash), 'Invalid message');
     require(!processedMessages[messageHash], 'Message already processed');
     processedMessages[messageHash] = true;
 
-    // Decode full message
     (
       ,
-      // skip messageHash since we already have it
       uint256 carId,
       address originalOwner,
       uint256 originalChainId,
@@ -194,14 +183,14 @@ contract HemDealerCrossChain is Ownable, ReentrancyGuard {
   ) external payable nonReentrant {
     require(msg.value == amount, 'Incorrect payment amount');
 
-    spokePool.deposit{value: msg.value}(
+    spokePool.deposit{ value: msg.value }(
       uint32(destinationChainId),
       recipient,
-      address(0), // native token
+      address(0),
       amount,
       relayerFeePct,
       quoteTimestamp,
-      '' // empty message for simple payments
+      ''
     );
   }
 
@@ -220,8 +209,8 @@ contract HemDealerCrossChain is Ownable, ReentrancyGuard {
     uint256 relayerFeePct,
     uint256 quoteTimestamp
   ) public view returns (bool) {
-    require(block.timestamp - quoteTimestamp <= 5 minutes, "Quote expired");
-    require(relayerFeePct <= MAX_SLIPPAGE, "Slippage too high");
+    require(block.timestamp - quoteTimestamp <= 5 minutes, 'Quote expired');
+    require(relayerFeePct <= MAX_SLIPPAGE, 'Slippage too high');
     return true;
   }
 }

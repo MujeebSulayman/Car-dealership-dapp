@@ -217,24 +217,22 @@ const buyCar = async (carId: number): Promise<void> => {
     const network = await provider.getNetwork()
 
     if (car.destinationChainId !== network.chainId) {
-      // Get quote for cross-chain transfer
       const quote = await getAcrossQuote(
         Number(ethers.formatEther(car.price)),
         car.destinationChainId
       )
 
-      // Calculate total amount including relayer fee
       const totalAmount = Number(car.price) + (Number(car.price) * quote.relayerFeePct) / 10000
 
       tx = await contract.buyCar(carId, quote.relayerFeePct, quote.quoteTimestamp, {
         value: totalAmount,
       })
     } else {
-      // Same chain purchase - pass 0 for relayerFeePct and current timestamp
+      // Same chain purchase 
       tx = await contract.buyCar(
         carId,
-        0, // relayerFeePct
-        Math.floor(Date.now() / 1000), // quoteTimestamp
+        0,
+        Math.floor(Date.now() / 1000),
         { value: car.price }
       )
     }
@@ -252,7 +250,6 @@ const getAcrossQuote = async (
   destinationChainId: number
 ): Promise<{ relayerFeePct: number; quoteTimestamp: number }> => {
   try {
-    // Call Across API to get quote
     const response = await fetch('https://across-v2-api.herokuapp.com/quote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

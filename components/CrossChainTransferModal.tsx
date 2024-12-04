@@ -26,7 +26,7 @@ export const CrossChainTransferModal = ({ isOpen, onClose, onTransfer, isTransfe
     try {
       await onTransfer(chainId)
       setTransferStatus('success')
-      setTimeout(() => onClose(), 2000) // Close modal after success
+      setTimeout(() => onClose(), 2000) 
     } catch (error) {
       setTransferStatus('error')
       console.error('Transfer failed:', error)

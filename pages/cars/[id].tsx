@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Image from 'next/image'
-import { motion } from 'framer-motion'
+
 import {
   FaEthereum,
   FaCar,
@@ -11,7 +11,6 @@ import {
   FaMapMarkerAlt,
   FaClock,
   FaCalendar,
-  FaChartLine,
   FaShieldAlt,
   FaHistory,
   FaExchangeAlt,
@@ -20,7 +19,12 @@ import {
   FaPhone,
   FaWallet,
 } from 'react-icons/fa'
-import { deleteCar, getCar, getEthereumContract, initiateCrossChainTransfer } from '@/services/blockchain'
+import {
+  deleteCar,
+  getCar,
+  getEthereumContract,
+  initiateCrossChainTransfer,
+} from '@/services/blockchain'
 import { CarStruct, CarCondition, CarTransmission, FuelType } from '@/utils/type.dt'
 import { useAccount, useConnect } from 'wagmi'
 import { InjectedConnector } from 'wagmi/connectors/injected'
@@ -57,7 +61,7 @@ const CarDetailsPage = () => {
   const [isTransferring, setIsTransferring] = useState(false)
   const [destinationChain, setDestinationChain] = useState<number>(0)
   const [showTransferModal, setShowTransferModal] = useState(false)
-    
+
   useEffect(() => {
     const loadCar = async () => {
       if (!id) return
@@ -482,4 +486,3 @@ const LoadingState = () => (
 )
 
 export default CarDetailsPage
-

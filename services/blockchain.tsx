@@ -65,8 +65,6 @@ const listCar = async (car: CarParams): Promise<void> => {
     if (car.paymentToken !== ethers.ZeroAddress) {
       return Promise.reject(new Error('Only native token is supported'))
     }
-
-    // Format the car data before sending to contract
     const formattedCar = {
       ...car,
       basicDetails: {
@@ -228,13 +226,8 @@ const buyCar = async (carId: number): Promise<void> => {
         value: totalAmount,
       })
     } else {
-      // Same chain purchase 
-      tx = await contract.buyCar(
-        carId,
-        0,
-        Math.floor(Date.now() / 1000),
-        { value: car.price }
-      )
+      // Same chain purchase
+      tx = await contract.buyCar(carId, 0, Math.floor(Date.now() / 1000), { value: car.price })
     }
 
     await tx.wait()
@@ -330,8 +323,6 @@ const bridgePayment = async (
 const isSupportedToken = async (token: string): Promise<boolean> => {
   try {
     console.log('Checking token support for:', token)
-
-    // Always allow native token (address(0))
     if (token === ethers.ZeroAddress) {
       console.log('Native token is always supported')
       return true

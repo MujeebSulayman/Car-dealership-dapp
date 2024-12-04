@@ -9,15 +9,7 @@ const Hero = () => {
 
   return (
     <div className="relative min-h-screen">
-      <div className="absolute inset-0 z-0">
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: "url('/images/hero-bg.jpg')",
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
-      </div>
+      
 
       <div className="relative z-10 pt-24 sm:pt-40 pb-16 sm:pb-24 px-4 sm:px-6 lg:px-8 min-h-screen flex flex-col justify-center">
         <motion.div
@@ -41,14 +33,14 @@ const Hero = () => {
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-5 justify-center mb-16 sm:mb-20 px-4 sm:px-0">
             <>
               <Link
-                href="/marketplace"
+                href="/cars"
                 className="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base font-semibold rounded-lg text-white bg-purple-600 hover:bg-purple-700 transition-all duration-300 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
               >
                 <FaSearch className="mr-2" />
                 Browse Cars
               </Link>
               <Link
-                href="/sell-car"
+                href="/list"
                 className="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base font-semibold rounded-lg text-purple-400 border-2 border-purple-400/30 hover:border-purple-400 hover:bg-purple-400/10 transition-all duration-300"
               >
                 <FaCar className="mr-2" />

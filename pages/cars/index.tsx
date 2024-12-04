@@ -24,7 +24,7 @@ const CarsPage = () => {
   }, [])
 
   return (
-    <div className="py-32 bg-gradient-to-r from-gray-900 via-gray-800 to-black min-h-screen">
+    <div className="py-32 a min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="text-4xl font-extrabold text-center text-white mb-8">
           Explore Our Web3 Car Collection

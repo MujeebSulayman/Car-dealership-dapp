@@ -30,7 +30,7 @@ const Home = () => {
   }, [])
 
   return (
-    <div className="bg-black">
+    <div className="bg-gradient-to-r from-gray-900 to-black min-h-screen flex flex-col text-white">
       <Hero />
       <Makers />
 

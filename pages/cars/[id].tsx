@@ -20,7 +20,6 @@ import {
   FaWallet,
 } from 'react-icons/fa'
 import {
-  deleteCar,
   getCar,
   getEthereumContract,
   initiateCrossChainTransfer,
@@ -99,10 +98,10 @@ const CarDetailsPage = () => {
       const contract = await getEthereumContract()
       const transaction = await contract.buyCar(
         car.id,
-        0, // relayerFeePct
-        Math.floor(Date.now() / 1000), // quoteTimestamp
+        0, 
+        Math.floor(Date.now() / 1000),
         {
-          value: car.price, // The price is already in wei from the contract
+          value: car.price, 
         }
       )
       await transaction.wait()

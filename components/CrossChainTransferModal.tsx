@@ -48,7 +48,7 @@ export const CrossChainTransferModal = ({ isOpen, onClose, onTransfer, isTransfe
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             className="bg-gray-900 rounded-2xl w-full max-w-md p-6"
-            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking modal content
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-white flex items-center">

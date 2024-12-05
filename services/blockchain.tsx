@@ -360,15 +360,6 @@ const cancelTimedOutTransfer = async (carId: number): Promise<void> => {
   }
 }
 
-const handleError = (error: any) => {
-  if (error.code === 4001) {
-    return 'Transaction rejected by user'
-  }
-  if (error.code === -32603) {
-    return 'Internal JSON-RPC error. Check gas settings'
-  }
-  return error.message || 'Unknown error occurred'
-}
 
 const validateQuote = async (
   contract: ethers.Contract,

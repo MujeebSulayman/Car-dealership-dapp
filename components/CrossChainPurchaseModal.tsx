@@ -29,10 +29,16 @@ export default function CrossChainPurchaseModal({
   const handleChainSelect = async (chainId: number) => {
     setLoading(true)
     try {
-      const quote = await getAcrossQuote(Number(ethers.parseEther(carPrice)), chainId)
-      const price = ethers.formatEther(quote.amount)
-      setChainPrice(price)
-      setSelectedChain(chainId)
+      // If source and destination chains are the same, use direct purchase
+      if (chainId === 11155111) { 
+        setChainPrice(carPrice)
+        setSelectedChain(chainId)
+      } else {
+        const quote = await getAcrossQuote(Number(ethers.parseEther(carPrice)), chainId)
+        const price = ethers.formatEther(quote.amount)
+        setChainPrice(price)
+        setSelectedChain(chainId)
+      }
     } catch (error) {
       console.error('Error getting chain price:', error)
       toast.error('Failed to get price quote')
@@ -136,13 +142,13 @@ export default function CrossChainPurchaseModal({
                       <h4 className="text-lg font-semibold text-white">Select Destination Chain</h4>
                       <div className="flex items-center space-x-2">
                         <Image
-                          src="/across-protocol-logo.png"
+                          src="/images/assets/across.png"
                           alt="Across Protocol"
-                          width={20}
-                          height={20}
+                          width={40}
+                          height={40}
                           className="rounded-full"
                         />
-                        <span className="text-sm text-purple-400">Across Protocol</span>
+                        <span className="text-sm text-gray-100">Across Protocol</span>
                       </div>
                     </div>
                     

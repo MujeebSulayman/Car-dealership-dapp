@@ -405,28 +405,33 @@ const getAcrossQuote = async (
   destinationChainId: number
 ): Promise<{ relayerFeePct: number; quoteTimestamp: number; amount: string }> => {
   try {
-    const response = await fetch('https://api.across.to/api/v1/quote', {
+    console.log('Requesting quote for amount:', amount, 'to chain:', destinationChainId)
+    const response = await fetch('/api/across-quote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        tokenSymbol: 'ETH',
         amount: amount.toString(),
-        originToken: ethers.ZeroAddress,
         destinationChainId: destinationChainId,
-        originChainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID || '11155111'),
-        destinationToken: ethers.ZeroAddress,
-        receiveNativeToken: true,
-      }),
+        originChainId: 11155111,
+        destinationAddress: '0x0000000000000000000000000000000000000000',
+        timestamp: Math.floor(Date.now() / 1000),
+        skipAmountLimit: true
+      })
     })
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`)
+      const errorData = await response.json()
+      console.error('Quote API error:', errorData)
+      throw new Error(errorData.error || 'Failed to fetch quote from Across Protocol')
     }
 
-    const quote = await response.json()
+    const data = await response.json()
+    console.log('Received quote data:', data)
     return {
-      relayerFeePct: quote.relayerFeePct,
-      quoteTimestamp: Math.floor(Date.now() / 1000),
-      amount: quote.amount,
+      relayerFeePct: data.relayerFeePct,
+      quoteTimestamp: data.timestamp,
+      amount: data.updatedOutputAmount || data.outputAmount
     }
   } catch (error) {
     console.error('Error getting Across quote:', error)
@@ -496,20 +501,41 @@ const isTransferTimedOut = async (carId: number): Promise<boolean> => {
 
 const purchaseCarFromChain = async (
   carId: number,
-  sourceChainId: number,
-  amount: string
-): Promise<void> => {
+  chainId: number,
+  price: string
+) => {
   try {
-    const contract = await getCrossChainContract()
-    const { relayerFeePct, quoteTimestamp } = await getAcrossQuote(Number(amount), sourceChainId)
+    const contract = await getEthereumContract()
+    if (!contract) throw new Error('Contract not initialized')
 
-    tx = await contract.purchaseCarFromChain(carId, sourceChainId, relayerFeePct, quoteTimestamp, {
-      value: ethers.parseEther(amount),
-    })
+    // If same chain (Sepolia to Sepolia), do direct purchase
+    if (chainId === 11155111) {
+      const tx = await contract.buyCar(
+        carId,
+        0,
+        Math.floor(Date.now() / 1000), 
+        {
+          value: ethers.parseEther(price)
+        }
+      )
+      await tx.wait()
+      return tx
+    }
 
+    // Otherwise, proceed with cross-chain purchase
+    const quote = await getAcrossQuote(Number(ethers.parseEther(price)), chainId)
+    const tx = await contract.buyCar(
+      carId,
+      quote.relayerFeePct,
+      quote.quoteTimestamp,
+      {
+        value: ethers.parseEther(quote.amount)
+      }
+    )
     await tx.wait()
+    return tx
   } catch (error) {
-    console.error('Error in cross-chain purchase:', error)
+    console.error('Error purchasing car:', error)
     throw error
   }
 }
@@ -550,4 +576,3 @@ export {
   purchaseCarFromChain,
   getCrossChainContract
 }
-

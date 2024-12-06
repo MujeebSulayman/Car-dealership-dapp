@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { motion } from 'framer-motion'
 import { useAccount } from 'wagmi'
-import { getCar, updateCar } from '@/services/blockchain'
+import { getCar, updateCar, deleteCar } from '@/services/blockchain'
 import { CarParams, CarCondition, CarTransmission, FuelType } from '@/utils/type.dt'
 import { toast } from 'react-toastify'
 import { FaPlus, FaTimes } from 'react-icons/fa'
@@ -14,6 +14,7 @@ const EditCarPage = () => {
   const { id } = router.query
   const { address } = useAccount()
   const [loading, setLoading] = useState(true)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [featureInput, setFeatureInput] = useState('')
   const [formData, setFormData] = useState<CarParams>({
     basicDetails: {
@@ -146,6 +147,22 @@ const EditCarPage = () => {
         features: prev.additionalInfo.features.filter((_, i) => i !== index),
       },
     }))
+  }
+
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this car?')) return
+
+    setIsDeleting(true)
+    try {
+      await deleteCar(Number(id))
+      toast.success('Car deleted successfully')
+      router.push('/')
+    } catch (error) {
+      console.error('Error deleting car:', error)
+      toast.error('Failed to delete car')
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   if (loading) {
@@ -451,27 +468,21 @@ const EditCarPage = () => {
             </div>
           </div>
 
-          <div className="flex justify-end space-x-4">
+          <div className="flex justify-end space-x-4 mt-8">
             <button
               type="button"
-              onClick={() => router.push(`/cars/${id}`)}
-              className="px-8 py-3 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-800 transition-colors"
+              onClick={handleDelete}
+              disabled={loading || isDeleting}
+              className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Cancel
+              {isDeleting ? 'Deleting...' : 'Delete Car'}
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="bg-purple-600 px-8 py-3 rounded-lg text-white font-semibold hover:bg-purple-700 disabled:opacity-50 transition-colors"
+              className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg hover:from-purple-600 hover:to-pink-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white" />
-                  <span>Updating...</span>
-                </div>
-              ) : (
-                'Update Vehicle'
-              )}
+              {loading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>

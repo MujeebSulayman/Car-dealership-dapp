@@ -18,12 +18,9 @@ import {
   FaEnvelope,
   FaPhone,
   FaWallet,
+  FaExclamationTriangle,
 } from 'react-icons/fa'
-import {
-  getCar,
-  getEthereumContract,
-  initiateCrossChainTransfer,
-} from '@/services/blockchain'
+import { getCar, getEthereumContract, purchaseCarFromChain, buyCar, deleteCar } from '@/services/blockchain'
 import { CarStruct, CarCondition, CarTransmission, FuelType } from '@/utils/type.dt'
 import { useAccount, useConnect } from 'wagmi'
 import { InjectedConnector } from 'wagmi/connectors/injected'
@@ -31,7 +28,9 @@ import Lightbox from 'react-image-lightbox'
 import 'react-image-lightbox/style.css'
 import { toast } from 'react-toastify'
 import { ethers } from 'ethers'
-import { CrossChainTransferModal } from '@/components/CrossChainTransferModal'
+import CrossChainPurchaseModal from '@/components/CrossChainPurchaseModal'
+import { Dialog, Transition } from '@headlessui/react'
+import { Fragment } from 'react'
 
 const formatPrice = (price: bigint | string | number): string => {
   try {
@@ -60,6 +59,11 @@ const CarDetailsPage = () => {
   const [isTransferring, setIsTransferring] = useState(false)
   const [destinationChain, setDestinationChain] = useState<number>(0)
   const [showTransferModal, setShowTransferModal] = useState(false)
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false)
+  const [isPurchasing, setIsPurchasing] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     const loadCar = async () => {
@@ -92,56 +96,62 @@ const CarDetailsPage = () => {
     }
   }
 
-  const handleBuyCar = async () => {
-    if (!car) return
+  const handlePurchase = async () => {
+    if (!isConnected) {
+      toast.error('Please connect your wallet first')
+      return
+    }
+    // Always show the chain selection modal
+    setShowPurchaseModal(true)
+  }
+
+  const handleChainPurchase = async (chainId: number, price: string) => {
+    setIsPurchasing(true)
     try {
-      const contract = await getEthereumContract()
-      const transaction = await contract.buyCar(
-        car.id,
-        0, 
-        Math.floor(Date.now() / 1000),
-        {
-          value: car.price, 
-        }
+      await purchaseCarFromChain(
+        Number(id),
+        chainId,
+        price
       )
-      await transaction.wait()
-      toast.success('Car purchased successfully!')
-      router.reload()
-    } catch (error) {
+      toast.success('Purchase initiated successfully!')
+      router.push('/profile')
+    } catch (error: any) {
       console.error('Error purchasing car:', error)
-      toast.error('Failed to purchase car. Please try again.')
+      toast.error(error.message || 'Failed to purchase car')
+    } finally {
+      setIsPurchasing(false)
+      setShowPurchaseModal(false)
     }
   }
 
-  const handleDeleteCar = async () => {
-    if (!car) return
-    if (!confirm('Are you sure you want to delete this listing?')) return
-
+  const handleDelete = async () => {
+    setIsDeleting(true)
     try {
-      const contract = await getEthereumContract()
-      const transaction = await contract.deleteCar(car.id)
-      await transaction.wait()
-      toast.success('Car listing deleted successfully!')
-      router.push('/cars')
+      await deleteCar(Number(id))
+      toast.success('Car deleted successfully')
+      router.push('/')
     } catch (error) {
       console.error('Error deleting car:', error)
-      toast.error('Failed to delete car listing. Please try again.')
+      toast.error('Failed to delete car')
+    } finally {
+      setIsDeleting(false)
+      setShowDeleteModal(false)
     }
   }
 
-  const handleCrossChainTransfer = async () => {
+  const handleCrossChainPurchase = async (chainId: number, amount: string) => {
     if (!car) return
-    setIsTransferring(true)
+    setIsPurchasing(true)
     try {
-      await initiateCrossChainTransfer(car.id, destinationChain)
-      toast.success('Cross-chain transfer initiated successfully!')
+      await purchaseCarFromChain(car.id, chainId, amount)
+      toast.success('Cross-chain purchase initiated!')
       router.reload()
     } catch (error) {
-      console.error('Error initiating cross-chain transfer:', error)
-      toast.error('Failed to initiate cross-chain transfer')
+      console.error('Error in cross-chain purchase:', error)
+      toast.error('Failed to complete purchase')
     } finally {
-      setIsTransferring(false)
-      setShowTransferModal(false)
+      setIsPurchasing(false)
+      setShowPurchaseModal(false)
     }
   }
 
@@ -349,48 +359,41 @@ const CarDetailsPage = () => {
             </div>
 
             {/* Action Buttons - Make them sticky on mobile */}
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900/95 backdrop-blur-sm lg:relative lg:bg-gray-800/30 lg:p-6 lg:rounded-xl z-50">
-              <div className="max-w-7xl mx-auto flex flex-col gap-2">
-                {isConnected ? (
-                  <>
-                    {address?.toLowerCase() === car.owner.toLowerCase() ? (
-                      <>
-                        <button
-                          onClick={() => router.push(`/cars/edit/${id}`)}
-                          className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors"
-                        >
-                          Edit Listing
-                        </button>
-                        <button
-                          onClick={handleDeleteCar}
-                          className="w-full border border-red-500 text-red-500 py-3 rounded-lg font-semibold hover:bg-red-500/10 transition-colors"
-                        >
-                          Delete Listing
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={handleBuyCar}
-                          className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors"
-                        >
-                          Buy Now
-                        </button>
-                      </>
-                    )}
-                  </>
-                ) : (
+            <div className="fixed bottom-0 left-0 right-0 lg:relative lg:mt-6 space-y-4 p-4 bg-gray-900/95 backdrop-blur-sm lg:bg-transparent lg:p-0">
+              {address && address.toLowerCase() === car.owner.toLowerCase() ? (
+                <div className="space-y-3">
                   <button
-                    onClick={() => connect()}
-                    className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors"
+                    onClick={() => router.push(`/cars/edit/${id}`)}
+                    className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 font-medium"
                   >
-                    Connect Wallet
+                    Edit Listing
                   </button>
-                )}
-              </div>
+                  <button
+                    onClick={() => setShowDeleteModal(true)}
+                    disabled={isDeleting}
+                    className="w-full px-6 py-3 border-2 border-purple-600 text-purple-500 rounded-lg hover:bg-purple-600 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete Listing'}
+                  </button>
+                </div>
+              ) : isConnected ? (
+                <button
+                  onClick={handlePurchase}
+                  disabled={loading || isPurchasing || isLoading}
+                  className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {isPurchasing ? 'Processing Purchase...' : isLoading ? 'Loading...' : 'Purchase Now'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => connect({ connector: new InjectedConnector() })}
+                  className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 font-medium"
+                >
+                  Connect Wallet
+                </button>
+              )}
             </div>
 
-            {/* Add padding at the bottom to account for fixed buttons on mobile */}
             <div className="pb-24 lg:pb-0">
               {/* Cross-Chain Transfer - Only show for owner */}
               {isConnected && address?.toLowerCase() === car.owner.toLowerCase() && (
@@ -411,14 +414,6 @@ const CarDetailsPage = () => {
                 </div>
               )}
 
-              <CrossChainTransferModal
-                isOpen={showTransferModal}
-                onClose={() => setShowTransferModal(false)}
-                onTransfer={handleCrossChainTransfer}
-                isTransferring={isTransferring}
-                currentChainId={Number(process.env.NEXT_PUBLIC_CHAIN_ID)}
-              />
-
               {/* History */}
               <div className="bg-gray-800/30 rounded-xl p-6 backdrop-blur-sm">
                 <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
@@ -434,6 +429,81 @@ const CarDetailsPage = () => {
           </div>
         </div>
       </div>
+      <Transition appear show={showDeleteModal} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => !isDeleting && setShowDeleteModal(false)}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black/80" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-gradient-to-b from-gray-900 to-black p-6 text-left align-middle shadow-xl transition-all border border-gray-800">
+                  <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full bg-red-100/10">
+                    <FaExclamationTriangle className="w-6 h-6 text-red-500" />
+                  </div>
+                  <Dialog.Title as="h3" className="text-xl font-bold text-center text-white mb-4">
+                    Delete Car Listing
+                  </Dialog.Title>
+                  <div className="mt-2">
+                    <p className="text-gray-300 text-center">
+                      Are you sure you want to delete this car listing? This action cannot be undone.
+                    </p>
+                  </div>
+
+                  <div className="mt-6 flex space-x-3">
+                    <button
+                      type="button"
+                      className="flex-1 px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-800 transition-colors duration-200 font-medium disabled:opacity-50"
+                      onClick={() => setShowDeleteModal(false)}
+                      disabled={isDeleting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? (
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                          <span>Deleting...</span>
+                        </div>
+                      ) : (
+                        'Delete'
+                      )}
+                    </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+      <CrossChainPurchaseModal
+        isOpen={showPurchaseModal}
+        onClose={() => setShowPurchaseModal(false)}
+        carPrice={formatPrice(car?.price || 0)}
+        onPurchase={handleChainPurchase}
+      />
     </div>
   )
 }

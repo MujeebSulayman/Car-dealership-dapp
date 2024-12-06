@@ -9,6 +9,8 @@ const fromWei = (num: number) => ethers.formatEther(num)
 
 let ethereum: any
 let tx: any
+let cachedProvider: ethers.BrowserProvider | null = null
+let cachedContract: ethers.Contract | null = null
 
 if (typeof window !== 'undefined') ethereum = (window as any).ethereum
 
@@ -17,19 +19,36 @@ const getEthereumContract = async () => {
     const accounts = await ethereum?.request?.({ method: 'eth_accounts' })
 
     if (accounts?.length > 0) {
-      const provider = new ethers.BrowserProvider(ethereum)
-      const signer = await provider.getSigner()
-      const contracts = new ethers.Contract(address.HemDealer, abi.abi, signer)
-      return contracts
+      if (!cachedProvider) {
+        cachedProvider = new ethers.BrowserProvider(ethereum)
+      }
+      if (!cachedContract) {
+        const signer = await cachedProvider.getSigner()
+        cachedContract = new ethers.Contract(address.HemDealer, abi.abi, signer)
+      }
+      return cachedContract
     } else {
       const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL)
-      const contracts = new ethers.Contract(address.HemDealer, abi.abi, provider)
-      return contracts
+      const contract = new ethers.Contract(address.HemDealer, abi.abi, provider)
+      return contract
     }
   } catch (error) {
     console.error('Failed to get Ethereum contract:', error)
     throw error
   }
+}
+
+// Reset cache when network or account changes
+if (typeof window !== 'undefined') {
+  ethereum?.on('chainChanged', () => {
+    cachedProvider = null
+    cachedContract = null
+  })
+
+  ethereum?.on('accountsChanged', () => {
+    cachedProvider = null
+    cachedContract = null
+  })
 }
 
 const getCrossChainContract = async () => {
@@ -85,6 +104,17 @@ const listCar = async (car: CarParams): Promise<void> => {
     console.log('Sending car data to blockchain:', formattedCar)
 
     const contract = await getEthereumContract()
+    const gasPrice = await cachedProvider?.getFeeData()
+
+    // Estimate gas with a fallback
+    const gasLimit = await contract.listCar.estimateGas(
+      formattedCar.basicDetails,
+      formattedCar.technicalDetails,
+      formattedCar.additionalInfo,
+      formattedCar.sellerDetails,
+      formattedCar.destinationChainId,
+      formattedCar.paymentToken
+    ).catch(() => BigInt(500000)) 
 
     tx = await contract.listCar(
       formattedCar.basicDetails,
@@ -94,12 +124,13 @@ const listCar = async (car: CarParams): Promise<void> => {
       formattedCar.destinationChainId,
       formattedCar.paymentToken,
       {
-        gasLimit: 3000000,
+        gasLimit: gasLimit,
+        maxFeePerGas: gasPrice?.maxFeePerGas || undefined,
+        maxPriorityFeePerGas: gasPrice?.maxPriorityFeePerGas || undefined,
       }
     )
 
     console.log('Transaction hash:', tx.hash)
-
     await tx.wait()
     console.log('Transaction confirmed')
     return Promise.resolve(tx)
@@ -122,13 +153,27 @@ const updateCar = async (carId: number, car: CarParams): Promise<void> => {
 
   try {
     const contract = await getEthereumContract()
+    const gasPrice = await cachedProvider?.getFeeData()
+
+    const gasLimit = await contract.updateCar.estimateGas(
+      carId,
+      car.basicDetails,
+      car.technicalDetails,
+      car.additionalInfo,
+      car.sellerDetails
+    ).catch(() => BigInt(400000))
 
     tx = await contract.updateCar(
       carId,
       car.basicDetails,
       car.technicalDetails,
       car.additionalInfo,
-      car.sellerDetails
+      car.sellerDetails,
+      {
+        gasLimit: gasLimit,
+        maxFeePerGas: gasPrice?.maxFeePerGas || undefined,
+        maxPriorityFeePerGas: gasPrice?.maxPriorityFeePerGas || undefined,
+      }
     )
 
     await tx.wait()
@@ -147,7 +192,16 @@ const deleteCar = async (carId: number): Promise<void> => {
 
   try {
     const contract = await getEthereumContract()
-    tx = await contract.deleteCar(carId)
+    
+    const gasLimit = await contract.deleteCar.estimateGas(carId).catch(() => BigInt(300000))
+    const gasPrice = await cachedProvider?.getFeeData()
+    
+    tx = await contract.deleteCar(carId, {
+      gasLimit: gasLimit,
+      maxFeePerGas: gasPrice?.maxFeePerGas || undefined,
+      maxPriorityFeePerGas: gasPrice?.maxPriorityFeePerGas || undefined,
+    })
+    
     await tx.wait()
     return Promise.resolve(tx)
   } catch (error) {
@@ -209,25 +263,80 @@ const buyCar = async (carId: number): Promise<void> => {
   try {
     const contract = await getEthereumContract()
     const car = await contract.getCar(carId)
+    const gasPrice = await cachedProvider?.getFeeData()
+    const chainId = await ethereum.request({ method: 'eth_chainId' })
+    const currentChainId = parseInt(chainId as string, 16)
 
-    // Check if cross-chain purchase is needed
-    const provider = contract.runner as ethers.Provider
-    const network = await provider.getNetwork()
-
-    if (car.destinationChainId !== network.chainId) {
+    if (car.destinationChainId !== currentChainId) {
+      // Cross-chain purchase
+      const crossChainContract = await getCrossChainContract()
       const quote = await getAcrossQuote(
         Number(ethers.formatEther(car.price)),
         car.destinationChainId
       )
 
+      // First bridge the payment
       const totalAmount = Number(car.price) + (Number(car.price) * quote.relayerFeePct) / 10000
+      const gasLimit = await crossChainContract.bridgePayment.estimateGas(
+        totalAmount,
+        car.seller.wallet,
+        car.destinationChainId,
+        quote.relayerFeePct,
+        quote.quoteTimestamp,
+        { value: totalAmount }
+      ).catch(() => BigInt(350000))
 
-      tx = await contract.buyCar(carId, quote.relayerFeePct, quote.quoteTimestamp, {
-        value: totalAmount,
-      })
+      tx = await crossChainContract.bridgePayment(
+        totalAmount,
+        car.seller.wallet,
+        car.destinationChainId,
+        quote.relayerFeePct,
+        quote.quoteTimestamp,
+        {
+          value: totalAmount,
+          gasLimit: gasLimit,
+          maxFeePerGas: gasPrice?.maxFeePerGas || undefined,
+          maxPriorityFeePerGas: gasPrice?.maxPriorityFeePerGas || undefined,
+        }
+      )
+      await tx.wait()
+
+      // Then initiate the cross-chain transfer
+      const transferGasLimit = await crossChainContract.initiateCrossChainTransfer.estimateGas(
+        carId,
+        car.destinationChainId,
+        quote.relayerFeePct,
+        quote.quoteTimestamp,
+        { value: totalAmount }
+      ).catch(() => BigInt(450000))
+
+      tx = await crossChainContract.initiateCrossChainTransfer(
+        carId,
+        car.destinationChainId,
+        quote.relayerFeePct,
+        quote.quoteTimestamp,
+        {
+          value: totalAmount,
+          gasLimit: transferGasLimit,
+          maxFeePerGas: gasPrice?.maxFeePerGas || undefined,
+          maxPriorityFeePerGas: gasPrice?.maxPriorityFeePerGas || undefined,
+        }
+      )
     } else {
       // Same chain purchase
-      tx = await contract.buyCar(carId, 0, Math.floor(Date.now() / 1000), { value: car.price })
+      const gasLimit = await contract.buyCar.estimateGas(
+        carId,
+        0, // relayerFeePct
+        Math.floor(Date.now() / 1000), // quoteTimestamp
+        { value: car.price }
+      ).catch(() => BigInt(350000))
+
+      tx = await contract.buyCar(carId, 0, Math.floor(Date.now() / 1000), {
+        value: car.price,
+        gasLimit: gasLimit,
+        maxFeePerGas: gasPrice?.maxFeePerGas || undefined,
+        maxPriorityFeePerGas: gasPrice?.maxPriorityFeePerGas || undefined,
+      })
     }
 
     await tx.wait()
@@ -235,35 +344,6 @@ const buyCar = async (carId: number): Promise<void> => {
   } catch (error) {
     reportError(error)
     return Promise.reject(error)
-  }
-}
-
-const getAcrossQuote = async (
-  amount: number,
-  destinationChainId: number
-): Promise<{ relayerFeePct: number; quoteTimestamp: number }> => {
-  try {
-    const response = await fetch('https://across-v2-api.herokuapp.com/quote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        amount: toWei(amount).toString(),
-        originToken: ethers.ZeroAddress,
-        destinationChainId: destinationChainId,
-        originChainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID || '11155111'),
-        destinationToken: ethers.ZeroAddress,
-        receiveNativeToken: true,
-      }),
-    })
-
-    const quote = await response.json()
-    return {
-      relayerFeePct: quote.relayerFeePct,
-      quoteTimestamp: Math.floor(Date.now() / 1000),
-    }
-  } catch (error) {
-    console.error('Error getting Across quote:', error)
-    throw error
   }
 }
 
@@ -320,6 +400,40 @@ const bridgePayment = async (
   }
 }
 
+const getAcrossQuote = async (
+  amount: number,
+  destinationChainId: number
+): Promise<{ relayerFeePct: number; quoteTimestamp: number; amount: string }> => {
+  try {
+    const response = await fetch('https://api.across.to/api/v1/quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: amount.toString(),
+        originToken: ethers.ZeroAddress,
+        destinationChainId: destinationChainId,
+        originChainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID || '11155111'),
+        destinationToken: ethers.ZeroAddress,
+        receiveNativeToken: true,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`)
+    }
+
+    const quote = await response.json()
+    return {
+      relayerFeePct: quote.relayerFeePct,
+      quoteTimestamp: Math.floor(Date.now() / 1000),
+      amount: quote.amount,
+    }
+  } catch (error) {
+    console.error('Error getting Across quote:', error)
+    throw error
+  }
+}
+
 const isSupportedToken = async (token: string): Promise<boolean> => {
   try {
     console.log('Checking token support for:', token)
@@ -350,8 +464,18 @@ const cancelTimedOutTransfer = async (carId: number): Promise<void> => {
   }
 
   try {
-    const contract = await getCrossChainContract()
-    tx = await contract.cancelTimedOutTransfer(carId)
+    const crossChainContract = await getCrossChainContract()
+    const gasPrice = await cachedProvider?.getFeeData()
+    
+    const gasLimit = await crossChainContract.cancelTimedOutTransfer.estimateGas(carId)
+      .catch(() => BigInt(300000))
+
+    tx = await crossChainContract.cancelTimedOutTransfer(carId, {
+      gasLimit: gasLimit,
+      maxFeePerGas: gasPrice?.maxFeePerGas || undefined,
+      maxPriorityFeePerGas: gasPrice?.maxPriorityFeePerGas || undefined,
+    })
+
     await tx.wait()
     return Promise.resolve(tx)
   } catch (error) {
@@ -360,6 +484,35 @@ const cancelTimedOutTransfer = async (carId: number): Promise<void> => {
   }
 }
 
+const isTransferTimedOut = async (carId: number): Promise<boolean> => {
+  try {
+    const crossChainContract = await getCrossChainContract()
+    return await crossChainContract.isTransferTimedOut(carId)
+  } catch (error) {
+    console.error('Error checking transfer timeout:', error)
+    return false
+  }
+}
+
+const purchaseCarFromChain = async (
+  carId: number,
+  sourceChainId: number,
+  amount: string
+): Promise<void> => {
+  try {
+    const contract = await getCrossChainContract()
+    const { relayerFeePct, quoteTimestamp } = await getAcrossQuote(Number(amount), sourceChainId)
+
+    tx = await contract.purchaseCarFromChain(carId, sourceChainId, relayerFeePct, quoteTimestamp, {
+      value: ethers.parseEther(amount),
+    })
+
+    await tx.wait()
+  } catch (error) {
+    console.error('Error in cross-chain purchase:', error)
+    throw error
+  }
+}
 
 const validateQuote = async (
   contract: ethers.Contract,
@@ -372,16 +525,6 @@ const validateQuote = async (
   } catch (error) {
     console.error('Quote validation failed:', error)
     return false
-  }
-}
-
-const isTransferTimedOut = async (carId: number): Promise<boolean> => {
-  try {
-    const contract = await getCrossChainContract()
-    return await contract.isTransferTimedOut(carId)
-  } catch (error) {
-    console.error('Error checking transfer timeout:', error)
-    throw error
   }
 }
 
@@ -404,4 +547,7 @@ export {
   getAcrossQuote,
   toWei,
   fromWei,
+  purchaseCarFromChain,
+  getCrossChainContract
 }
+

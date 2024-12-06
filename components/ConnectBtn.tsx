@@ -2,7 +2,6 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import Image from 'next/image'
 import React from 'react'
 import { motion } from 'framer-motion'
-import { signIn } from 'next-auth/react'
 
 const ConnectBtn: React.FC<{ networks?: boolean }> = ({ networks }) => {
   const buttonVariants = {
@@ -22,7 +21,6 @@ const ConnectBtn: React.FC<{ networks?: boolean }> = ({ networks }) => {
       await openConnectModal()
     } catch (error) {
       console.error('Connection error:', error)
-      // Add user feedback here
     }
   }
 
@@ -31,7 +29,6 @@ const ConnectBtn: React.FC<{ networks?: boolean }> = ({ networks }) => {
       await openChainModal()
     } catch (error) {
       console.error('Network switch error:', error)
-      // Add user feedback here
     }
   }
 

@@ -66,20 +66,27 @@ const CarDetailsPage = () => {
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    const loadCar = async () => {
+    const fetchCar = async () => {
       if (!id) return
+      setLoading(true)
       try {
         const carData = await getCar(Number(id))
+        if (!carData) {
+          toast.error('This car listing has been deleted')
+          router.push('/cars')
+          return
+        }
         setCar(carData)
       } catch (error) {
-        console.error('Error loading car:', error)
+        console.error('Error fetching car:', error)
+        toast.error('Error loading car details')
       } finally {
         setLoading(false)
       }
     }
 
-    loadCar()
-  }, [id])
+    fetchCar()
+  }, [id, router])
 
   const handleShare = () => {
     if (navigator.share) {
@@ -114,7 +121,7 @@ const CarDetailsPage = () => {
         price
       )
       toast.success('Purchase initiated successfully!')
-      router.push('/profile')
+      router.push(`/cars/${id}`)
     } catch (error: any) {
       console.error('Error purchasing car:', error)
       toast.error(error.message || 'Failed to purchase car')
@@ -364,9 +371,14 @@ const CarDetailsPage = () => {
                 <div className="space-y-3">
                   <button
                     onClick={() => router.push(`/cars/edit/${id}`)}
-                    className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 font-medium"
+                    disabled={car.sold}
+                    className={`w-full px-6 py-3 ${
+                      car.sold 
+                        ? 'bg-gray-600 cursor-not-allowed' 
+                        : 'bg-purple-600 hover:bg-purple-700'
+                    } text-white rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium`}
                   >
-                    Edit Listing
+                    {car.sold ? 'Car Already Sold' : 'Edit Listing'}
                   </button>
                   <button
                     onClick={() => setShowDeleteModal(true)}
@@ -379,10 +391,21 @@ const CarDetailsPage = () => {
               ) : isConnected ? (
                 <button
                   onClick={handlePurchase}
-                  disabled={loading || isPurchasing || isLoading}
-                  className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  disabled={loading || isPurchasing || isLoading || car.sold}
+                  className={`w-full px-6 py-3 ${
+                    car.sold 
+                      ? 'bg-gray-600 cursor-not-allowed' 
+                      : 'bg-purple-600 hover:bg-purple-700'
+                  } text-white rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium`}
                 >
-                  {isPurchasing ? 'Processing Purchase...' : isLoading ? 'Loading...' : 'Purchase Now'}
+                  {car.sold 
+                    ? 'Car Already Sold' 
+                    : isPurchasing 
+                      ? 'Processing Purchase...' 
+                      : isLoading 
+                        ? 'Loading...' 
+                        : 'Purchase Now'
+                  }
                 </button>
               ) : (
                 <button

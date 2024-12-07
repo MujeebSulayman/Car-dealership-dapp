@@ -8,6 +8,11 @@ module.exports = {
       url: process.env.NEXT_PUBLIC_RPC_URL,
       accounts: [process.env.PRIVATE_KEY],
     },
+    polygon_mumbai: {
+      url: process.env.POLYGON_RPC_URL,
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 80001
+    },
   },
   solidity: {
     version: '0.8.19',

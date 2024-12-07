@@ -3,6 +3,7 @@ import address from '../contracts/contractAddresses.json'
 import abi from '../artifacts/contracts/HemDealer.sol/HemDealer.json'
 import crossChainAbi from '../artifacts/contracts/HemDealerCrossChain.sol/HemDealerCrossChain.json'
 import { CarParams, CarStruct, SalesStruct } from '@/utils/type.dt'
+import { chainConfig } from '../config/chains'
 
 const toWei = (num: number) => ethers.parseEther(num.toString())
 const fromWei = (num: number) => ethers.formatEther(num)
@@ -11,25 +12,68 @@ let ethereum: any
 let tx: any
 let cachedProvider: ethers.BrowserProvider | null = null
 let cachedContract: ethers.Contract | null = null
+let cachedChainId: number | null = null
 
 if (typeof window !== 'undefined') ethereum = (window as any).ethereum
 
-const getEthereumContract = async () => {
+const getChainConfig = (chainId: number) => {
+  return Object.values(chainConfig).find(chain => chain.chainId === chainId)
+}
+
+const switchNetwork = async (chainId: number) => {
+  const config = getChainConfig(chainId)
+  if (!config) throw new Error('Unsupported chain')
+
+  try {
+    await ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: `0x${chainId.toString(16)}` }],
+    })
+  } catch (error: any) {
+    // If the chain hasn't been added to MetaMask
+    if (error.code === 4902) {
+      await ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [{
+          chainId: `0x${chainId.toString(16)}`,
+          chainName: config.name,
+          rpcUrls: [config.rpcUrl],
+          blockExplorerUrls: [config.explorer],
+          nativeCurrency: {
+            name: chainId === 137 ? 'MATIC' : 'ETH',
+            symbol: chainId === 137 ? 'MATIC' : 'ETH',
+            decimals: 18
+          }
+        }]
+      })
+    } else {
+      throw error
+    }
+  }
+}
+
+const getEthereumContract = async (chainId?: number) => {
   try {
     const accounts = await ethereum?.request?.({ method: 'eth_accounts' })
+    const currentChainId = chainId || (await ethereum?.request({ method: 'eth_chainId' }))
+    const config = getChainConfig(Number(currentChainId))
+    
+    if (!config) throw new Error('Unsupported chain')
 
     if (accounts?.length > 0) {
-      if (!cachedProvider) {
+      if (!cachedProvider || cachedChainId !== currentChainId) {
         cachedProvider = new ethers.BrowserProvider(ethereum)
+        cachedChainId = currentChainId
       }
-      if (!cachedContract) {
+      if (!cachedContract || cachedChainId !== currentChainId) {
         const signer = await cachedProvider.getSigner()
-        cachedContract = new ethers.Contract(address.HemDealer, abi.abi, signer)
+        cachedContract = new ethers.Contract(config.contracts.HemDealer, abi.abi, signer)
+        cachedChainId = currentChainId
       }
       return cachedContract
     } else {
-      const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL)
-      const contract = new ethers.Contract(address.HemDealer, abi.abi, provider)
+      const provider = new ethers.JsonRpcProvider(config.rpcUrl)
+      const contract = new ethers.Contract(config.contracts.HemDealer, abi.abi, provider)
       return contract
     }
   } catch (error) {
@@ -38,29 +82,21 @@ const getEthereumContract = async () => {
   }
 }
 
-// Reset cache when network or account changes
-if (typeof window !== 'undefined') {
-  ethereum?.on('chainChanged', () => {
-    cachedProvider = null
-    cachedContract = null
-  })
-
-  ethereum?.on('accountsChanged', () => {
-    cachedProvider = null
-    cachedContract = null
-  })
-}
-
-const getCrossChainContract = async () => {
+const getCrossChainContract = async (chainId?: number) => {
   try {
     const accounts = await ethereum?.request?.({ method: 'eth_accounts' })
+    const currentChainId = chainId || (await ethereum?.request({ method: 'eth_chainId' }))
+    const config = getChainConfig(Number(currentChainId))
+    
+    if (!config) throw new Error('Unsupported chain')
+
     if (accounts?.length > 0) {
       const provider = new ethers.BrowserProvider(ethereum)
       const signer = await provider.getSigner()
-      return new ethers.Contract(address.HemDealerCrossChain, crossChainAbi.abi, signer)
+      return new ethers.Contract(config.contracts.HemDealerCrossChain, crossChainAbi.abi, signer)
     } else {
-      const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL)
-      return new ethers.Contract(address.HemDealerCrossChain, crossChainAbi.abi, provider)
+      const provider = new ethers.JsonRpcProvider(config.rpcUrl)
+      return new ethers.Contract(config.contracts.HemDealerCrossChain, crossChainAbi.abi, provider)
     }
   } catch (error) {
     console.error('Failed to get CrossChain contract:', error)
@@ -210,12 +246,15 @@ const deleteCar = async (carId: number): Promise<void> => {
   }
 }
 
-const getCar = async (carId: number): Promise<CarStruct> => {
+const getCar = async (carId: number): Promise<CarStruct | null> => {
   try {
     const contract = await getEthereumContract()
     tx = await contract.getCar(carId)
     return Promise.resolve(tx)
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.reason === "Car has been deleted") {
+      return Promise.resolve(null)
+    }
     reportError(error)
     return Promise.reject(error)
   }
@@ -246,9 +285,12 @@ const getMyCars = async (): Promise<CarStruct[]> => {
 const getAllSales = async (): Promise<SalesStruct[]> => {
   try {
     const contract = await getEthereumContract()
+    console.log('Getting sales from contract:', contract.address)
     tx = await contract.getAllSales()
+    console.log('Raw sales data:', tx)
     return Promise.resolve(tx)
   } catch (error) {
+    console.error('Error in getAllSales:', error)
     reportError(error)
     return Promise.reject(error)
   }
@@ -510,30 +552,54 @@ const purchaseCarFromChain = async (
 
     // If same chain (Sepolia to Sepolia), do direct purchase
     if (chainId === 11155111) {
+      try {
+        const tx = await contract.buyCar(
+          carId,
+          0,
+          Math.floor(Date.now() / 1000),
+          {
+            value: ethers.parseEther(price)
+          }
+        )
+        await tx.wait()
+        return tx
+      } catch (error: any) {
+        if (error?.message?.includes('insufficient funds')) {
+          throw new Error('Insufficient funds to cover car price and gas fees. Please ensure you have enough ETH for both the car price and transaction fees.')
+        } else if (error?.message?.includes('user rejected')) {
+          throw new Error('Transaction was rejected by user')
+        } else if (error?.message?.includes('Invalid purchase')) {
+          throw new Error('This car is not available for purchase')
+        } else {
+          throw error
+        }
+      }
+    }
+
+    // Otherwise, proceed with cross-chain purchase
+    try {
+      const quote = await getAcrossQuote(Number(ethers.parseEther(price)), chainId)
       const tx = await contract.buyCar(
         carId,
-        0,
-        Math.floor(Date.now() / 1000), 
+        quote.relayerFeePct,
+        quote.quoteTimestamp,
         {
-          value: ethers.parseEther(price)
+          value: ethers.parseEther(quote.amount)
         }
       )
       await tx.wait()
       return tx
-    }
-
-    // Otherwise, proceed with cross-chain purchase
-    const quote = await getAcrossQuote(Number(ethers.parseEther(price)), chainId)
-    const tx = await contract.buyCar(
-      carId,
-      quote.relayerFeePct,
-      quote.quoteTimestamp,
-      {
-        value: ethers.parseEther(quote.amount)
+    } catch (error: any) {
+      if (error?.message?.includes('insufficient funds')) {
+        throw new Error('Insufficient funds to cover car price, bridge fees, and gas fees. Please ensure you have enough ETH.')
+      } else if (error?.message?.includes('user rejected')) {
+        throw new Error('Transaction was rejected by user')
+      } else if (error?.message?.includes('Invalid purchase')) {
+        throw new Error('This car is not available for purchase')
+      } else {
+        throw error
       }
-    )
-    await tx.wait()
-    return tx
+    }
   } catch (error) {
     console.error('Error purchasing car:', error)
     throw error
@@ -574,5 +640,7 @@ export {
   toWei,
   fromWei,
   purchaseCarFromChain,
-  getCrossChainContract
+  getCrossChainContract,
+  switchNetwork
 }
+

@@ -154,7 +154,7 @@ const EditCarPage = () => {
 
     setIsDeleting(true)
     try {
-      await deleteCar(Number(id))
+      await deleteCar(id)
       toast.success('Car deleted successfully')
       router.push('/')
     } catch (error) {

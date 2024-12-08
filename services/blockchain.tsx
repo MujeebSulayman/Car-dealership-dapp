@@ -16,39 +16,13 @@ let cachedChainId: number | null = null
 if (typeof window !== 'undefined') ethereum = (window as any).ethereum
 
 const getChainConfig = (chainId: number) => {
-  return Object.values(chainConfig).find(chain => chain.chainId === chainId)
-}
-
-const switchNetwork = async (chainId: number) => {
-  const config = getChainConfig(chainId)
-  if (!config) throw new Error('Unsupported chain')
-
-  try {
-    await ethereum.request({
-      method: 'wallet_switchEthereumChain',
-      params: [{ chainId: `0x${chainId.toString(16)}` }],
-    })
-  } catch (error: any) {
-    if (error.code === 4902) {
-      await ethereum.request({
-        method: 'wallet_addEthereumChain',
-        params: [{
-          chainId: `0x${chainId.toString(16)}`,
-          chainName: config.name,
-          rpcUrls: [config.rpcUrl],
-          blockExplorerUrls: [config.explorer],
-          nativeCurrency: {
-            name: chainId === 11155111 ? 'ETH' : 'AMOY',
-            symbol: chainId === 11155111 ? 'ETH' : 'AMOY',
-            decimals: 18
-          }
-        }]
-      })
-    } else {
-      throw error
-    }
+  const config = chainConfig.sepolia
+  if (config.chainId !== chainId) {
+    throw new Error(`Unsupported chain. Only Sepolia (${config.chainId}) is supported.`)
   }
+  return config
 }
+
 
 const getEthereumContract = async (chainId?: number) => {
   try {
@@ -70,7 +44,7 @@ const getEthereumContract = async (chainId?: number) => {
       }
       return cachedContract
     } else {
-      const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL)
+      const provider = new ethers.JsonRpcProvider(config.rpcUrl)
       const contract = new ethers.Contract(config.contracts.HemDealer, abi.abi, provider)
       return contract
     }
@@ -81,7 +55,7 @@ const getEthereumContract = async (chainId?: number) => {
 }
 
 const getCrossChainContract = async (chainId?: number) => {
-  try {
+  
     const accounts = await ethereum?.request?.({ method: 'eth_accounts' })
     const currentChainId = chainId || (await ethereum?.request({ method: 'eth_chainId' }))
     const config = getChainConfig(Number(currentChainId))
@@ -91,16 +65,17 @@ const getCrossChainContract = async (chainId?: number) => {
     if (accounts?.length > 0) {
       const provider = new ethers.BrowserProvider(ethereum)
       const signer = await provider.getSigner()
-      return new ethers.Contract(config.contracts.HemDealerCrossChain, crossChainAbi.abi, signer)
+      const contract = new ethers.Contract(config.contracts.HemDealerCrossChain, crossChainAbi.abi, signer)
+
+      return contract
     } else {
-      const provider = new ethers.JsonRpcProvider(config.rpcUrl)
-      return new ethers.Contract(config.contracts.HemDealerCrossChain, crossChainAbi.abi, provider)
+      const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL)
+
+      const contract = new ethers.Contract(config.contracts.HemDealerCrossChain, crossChainAbi.abi, provider)
+      return contract
     }
-  } catch (error) {
-    console.error('Failed to get CrossChain contract:', error)
-    throw error
-  }
-}
+  } 
+
 
 const listCar = async (car: CarParams): Promise<void> => {
   if (!ethereum) {
@@ -636,6 +611,4 @@ export {
   fromWei,
   purchaseCarFromChain,
   getCrossChainContract,
-  switchNetwork
 }
-

@@ -9,16 +9,5 @@ export const chainConfig = {
       AcrossRouter: '0xC499a572640B64eA1C8c194c43Bc3E19940719dC'
     },
     explorer: 'https://sepolia.etherscan.io'
-  },
-  polygon: {
-    chainId: 80002,
-    name: 'Polygon_amoy',
-    rpcUrl: process.env.POLYGON_RPC_URL,
-    contracts: {
-      HemDealer: '',
-      HemDealerCrossChain: '',
-      AcrossRouter: '0xC499a572640B64eA1C8c194c43Bc3E19940719dC'
-    },
-    explorer: 'https://amoy.polygonscan.com/'
   }
 }

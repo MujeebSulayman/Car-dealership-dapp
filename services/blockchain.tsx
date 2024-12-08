@@ -54,19 +54,28 @@ const getEthereumContract = async (chainId?: number) => {
   try {
     const accounts = await ethereum?.request?.({ method: 'eth_accounts' })
     const currentChainId = chainId || (await ethereum?.request({ method: 'eth_chainId' }))
-    const config = getChainConfig(Number(currentChainId))
+    const parsedChainId = Number(currentChainId)
+    console.log('Current Chain ID:', parsedChainId)
     
-    if (!config) throw new Error('Unsupported chain')
+    const config = getChainConfig(parsedChainId)
+    
+    if (!config) {
+      console.error('Unsupported Chain Configuration:', {
+        chainId: parsedChainId,
+        availableChains: Object.values(chainConfig).map(chain => chain.chainId)
+      })
+      throw new Error(`Unsupported chain: ${parsedChainId}`)
+    }
 
     if (accounts?.length > 0) {
-      if (!cachedProvider || cachedChainId !== currentChainId) {
+      if (!cachedProvider || cachedChainId !== parsedChainId) {
         cachedProvider = new ethers.BrowserProvider(ethereum)
-        cachedChainId = currentChainId
+        cachedChainId = parsedChainId
       }
-      if (!cachedContract || cachedChainId !== currentChainId) {
+      if (!cachedContract || cachedChainId !== parsedChainId) {
         const signer = await cachedProvider.getSigner()
         cachedContract = new ethers.Contract(config.contracts.HemDealer, abi.abi, signer)
-        cachedChainId = currentChainId
+        cachedChainId = parsedChainId
       }
       return cachedContract
     } else {
@@ -260,25 +269,14 @@ const getCar = async (carId: number): Promise<CarStruct | null> => {
 
 const getAllCars = async (): Promise<CarStruct[]> => {
   try {
-    if (!ethereum) {
-      // Use fallback provider when MetaMask is not available
-      const provider = new ethers.JsonRpcProvider(chainConfig.sepolia.rpcUrl)
-      const contract = new ethers.Contract(
-        chainConfig.sepolia.contracts.HemDealer,
-        abi.abi,
-        provider
-      )
-      const cars = await contract.getAllCars()
-      return cars
-    }
-
-    const contract = await getEthereumContract()
-    if (!contract) return []
+    // Default to Sepolia if no chain is selected
+    const defaultChainId = 11155111 // Sepolia
+    const contract = await getEthereumContract(defaultChainId)
     const cars = await contract.getAllCars()
-    return cars
+    return Promise.resolve(cars)
   } catch (error) {
-    console.error('Error fetching cars:', error)
-    return []
+    reportError(error)
+    return Promise.reject(error)
   }
 }
 

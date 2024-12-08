@@ -7,21 +7,7 @@ const CarsPage = () => {
   const [cars, setCars] = useState<CarStruct[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const loadCars = async () => {
-      try {
-        const contract = await getEthereumContract()
-        const allCars = await contract.getAllCars()
-        setCars(allCars)
-      } catch (error) {
-        console.error('Error loading cars:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
 
-    loadCars()
-  }, [])
 
   return (
     <div className="py-32 a min-h-screen">

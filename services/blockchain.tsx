@@ -54,32 +54,23 @@ const getEthereumContract = async (chainId?: number) => {
   try {
     const accounts = await ethereum?.request?.({ method: 'eth_accounts' })
     const currentChainId = chainId || (await ethereum?.request({ method: 'eth_chainId' }))
-    const parsedChainId = Number(currentChainId)
-    console.log('Current Chain ID:', parsedChainId)
+    const config = getChainConfig(Number(currentChainId))
     
-    const config = getChainConfig(parsedChainId)
-    
-    if (!config) {
-      console.error('Unsupported Chain Configuration:', {
-        chainId: parsedChainId,
-        availableChains: Object.values(chainConfig).map(chain => chain.chainId)
-      })
-      throw new Error(`Unsupported chain: ${parsedChainId}`)
-    }
+    if (!config) throw new Error('Unsupported chain')
 
     if (accounts?.length > 0) {
-      if (!cachedProvider || cachedChainId !== parsedChainId) {
+      if (!cachedProvider || cachedChainId !== currentChainId) {
         cachedProvider = new ethers.BrowserProvider(ethereum)
-        cachedChainId = parsedChainId
+        cachedChainId = currentChainId
       }
-      if (!cachedContract || cachedChainId !== parsedChainId) {
+      if (!cachedContract || cachedChainId !== currentChainId) {
         const signer = await cachedProvider.getSigner()
         cachedContract = new ethers.Contract(config.contracts.HemDealer, abi.abi, signer)
-        cachedChainId = parsedChainId
+        cachedChainId = currentChainId
       }
       return cachedContract
     } else {
-      const provider = new ethers.JsonRpcProvider(config.rpcUrl)
+      const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL)
       const contract = new ethers.Contract(config.contracts.HemDealer, abi.abi, provider)
       return contract
     }
@@ -269,11 +260,9 @@ const getCar = async (carId: number): Promise<CarStruct | null> => {
 
 const getAllCars = async (): Promise<CarStruct[]> => {
   try {
-    // Default to Sepolia if no chain is selected
-    const defaultChainId = 11155111 // Sepolia
-    const contract = await getEthereumContract(defaultChainId)
-    const cars = await contract.getAllCars()
-    return Promise.resolve(cars)
+    const contract = await getEthereumContract()
+    tx = await contract.getAllCars()
+    return Promise.resolve(tx)
   } catch (error) {
     reportError(error)
     return Promise.reject(error)
@@ -294,12 +283,9 @@ const getMyCars = async (): Promise<CarStruct[]> => {
 const getAllSales = async (): Promise<SalesStruct[]> => {
   try {
     const contract = await getEthereumContract()
-    console.log('Getting sales from contract:', contract.address)
     tx = await contract.getAllSales()
-    console.log('Raw sales data:', tx)
     return Promise.resolve(tx)
   } catch (error) {
-    console.error('Error in getAllSales:', error)
     reportError(error)
     return Promise.reject(error)
   }
@@ -652,3 +638,4 @@ export {
   getCrossChainContract,
   switchNetwork
 }
+

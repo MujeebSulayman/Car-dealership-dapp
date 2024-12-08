@@ -2,7 +2,7 @@ export const chainConfig = {
   sepolia: {
     chainId: 11155111,
     name: 'Sepolia',
-    rpcUrl: process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL,
+    rpcUrl: process.env.NEXT_PUBLIC_RPC_URL,
     contracts: {
       HemDealer: '0x27ac084312e314837ac262999dc53e19d037C7b2',
       HemDealerCrossChain: '0x702a8cBFBEF7b4e25054549e945559666cDdD476',

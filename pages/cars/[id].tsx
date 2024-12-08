@@ -362,7 +362,7 @@ const CarDetailsPage = () => {
                   <button
                     onClick={() => setShowDeleteModal(true)}
                     disabled={isDeleting}
-                    className="w-full px-6 py-3 border-2 border-purple-600 text-purple-500 rounded-lg hover:bg-purple-600 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    className="w-full px-6 py-3 border-2 border-purple-600 text-purple-500 rounded-lg hover:bg-purple-600/30 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                   >
                     {isDeleting ? 'Deleting...' : 'Delete Listing'}
                   </button>
@@ -426,17 +426,10 @@ const CarDetailsPage = () => {
 
                       <button
                         onClick={() => setShowTransferModal(true)}
-                        disabled={car.sold}
-                        className="w-full mt-2 px-6 py-3 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-lg hover:bg-purple-600/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
+                        className="w-full mt-2 px-6 py-3 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-lg hover:bg-purple-600/30 transition-all duration-200 font-medium flex items-center justify-center gap-2"
                       >
-                        {car.sold ? (
-                          'Car Already Sold'
-                        ) : (
-                          <>
-                            <span>Start Transfer</span>
-                            <FaArrowRight className="h-4 w-4 transform transition-transform group-hover:translate-x-1" />
-                          </>
-                        )}
+                        <span>Start Transfer</span>
+                        <FaArrowRight className="h-4 w-4 transform transition-transform group-hover:translate-x-1" />
                       </button>
                     </div>
                   </div>

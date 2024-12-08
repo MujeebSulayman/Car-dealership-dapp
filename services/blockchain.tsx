@@ -1,5 +1,4 @@
 import { ethers } from 'ethers'
-import address from '../contracts/contractAddresses.json'
 import abi from '../artifacts/contracts/HemDealer.sol/HemDealer.json'
 import crossChainAbi from '../artifacts/contracts/HemDealerCrossChain.sol/HemDealerCrossChain.json'
 import { CarParams, CarStruct, SalesStruct } from '@/utils/type.dt'
@@ -30,7 +29,6 @@ const switchNetwork = async (chainId: number) => {
       params: [{ chainId: `0x${chainId.toString(16)}` }],
     })
   } catch (error: any) {
-    // If the chain hasn't been added to MetaMask
     if (error.code === 4902) {
       await ethereum.request({
         method: 'wallet_addEthereumChain',
@@ -40,8 +38,8 @@ const switchNetwork = async (chainId: number) => {
           rpcUrls: [config.rpcUrl],
           blockExplorerUrls: [config.explorer],
           nativeCurrency: {
-            name: chainId === 137 ? 'MATIC' : 'ETH',
-            symbol: chainId === 137 ? 'MATIC' : 'ETH',
+            name: chainId === 11155111 ? 'ETH' : 'AMOY',
+            symbol: chainId === 11155111 ? 'ETH' : 'AMOY',
             decimals: 18
           }
         }]
@@ -262,12 +260,25 @@ const getCar = async (carId: number): Promise<CarStruct | null> => {
 
 const getAllCars = async (): Promise<CarStruct[]> => {
   try {
+    if (!ethereum) {
+      // Use fallback provider when MetaMask is not available
+      const provider = new ethers.JsonRpcProvider(chainConfig.sepolia.rpcUrl)
+      const contract = new ethers.Contract(
+        chainConfig.sepolia.contracts.HemDealer,
+        abi.abi,
+        provider
+      )
+      const cars = await contract.getAllCars()
+      return cars
+    }
+
     const contract = await getEthereumContract()
-    tx = await contract.getAllCars()
-    return Promise.resolve(tx)
+    if (!contract) return []
+    const cars = await contract.getAllCars()
+    return cars
   } catch (error) {
-    reportError(error)
-    return Promise.reject(error)
+    console.error('Error fetching cars:', error)
+    return []
   }
 }
 
@@ -643,4 +654,3 @@ export {
   getCrossChainContract,
   switchNetwork
 }
-

@@ -36,9 +36,9 @@ export default function CrossChainTransferModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tokenSymbol: 'ETH',
-          amount: '1000000000000000', // 0.001 ETH as minimum for quote
+          amount: '1000000000000000',
           destinationChainId: chain.id,
-          originChainId: 11155111, // Sepolia testnet
+          originChainId: 11155111, 
           destinationAddress: '0x0000000000000000000000000000000000000000',
           timestamp: Math.floor(Date.now() / 1000),
           skipAmountLimit: true

@@ -173,18 +173,20 @@ const CarDetailsPage = () => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Car Title and Price Section */}
-        <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4">
+        <div className="flex flex-col mb-6">
           <div className="w-full">
-            <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">{car.name}</h1>
-            <div className="flex flex-wrap items-center text-gray-400 gap-2 mb-4">
-              <div className="flex items-center">
-                <FaMapMarkerAlt className="mr-2" />
-                <span>{car.location}</span>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+              <h1 className="text-xl sm:text-4xl font-bold text-white">{car.name}</h1>
+              <div className="flex items-center py-2 rounded-lg">
+                <FaEthereum className="text-purple-400 text-xl mr-2" />
+                <span className="flex  text-white font-bold lg:text-3xl text-xl ">{formatPrice(car.price)} ETH</span>
               </div>
             </div>
-            <div className="flex items-center text-2xl sm:text-3xl font-bold text-white">
-              <FaEthereum className="mr-2 text-purple-400" />
-              <span>{formatPrice(car.price)} ETH</span>
+
+            {/* Location - Adjusted spacing */}
+            <div className="flex items-center text-gray-400 mt-2">
+              <FaMapMarkerAlt className="text-base sm:text-lg mr-1.5" />
+              <span className="text-sm sm:text-base">{car.location}</span>
             </div>
           </div>
         </div>

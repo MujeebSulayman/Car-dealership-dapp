@@ -678,8 +678,8 @@
       ]
     },
     "C:\\Users\\HP\\Documents\\Projects\\HemDealer\\contracts\\HemDealerCrossChain.sol": {
-      "lastModificationDate": 1733227638144,
-      "contentHash": "3b9c7b8d29aa505af968793707f6ee26",
+      "lastModificationDate": 1733326077423,
+      "contentHash": "5278d43a2b0331a8d0e73796f4da6861",
       "sourceName": "contracts/HemDealerCrossChain.sol",
       "solcConfig": {
         "version": "0.8.19",

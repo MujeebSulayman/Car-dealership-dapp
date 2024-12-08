@@ -35,10 +35,10 @@ export const CHAIN_DATA = {
     status: 'commingSoon'
   },
   POLYGON: {
-    id: 80001,
+    id: 80002,
     name: 'Polygon',
     logo: 'https://assets.coingecko.com/coins/images/4713/large/matic-token-icon.png',
-    rpcUrl: 'https://rpc-mumbai.maticvigil.com',
+    rpcUrl: 'https://amoy.polygonscan.com/',
     status: 'available'
   }
 } as const

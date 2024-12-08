@@ -19,6 +19,7 @@ import {
   FaPhone,
   FaWallet,
   FaExclamationTriangle,
+  FaArrowRight,
 } from 'react-icons/fa'
 import { getCar, purchaseCarFromChain, deleteCar } from '@/services/blockchain'
 import { CarStruct, CarCondition, CarTransmission, FuelType } from '@/utils/type.dt'
@@ -29,6 +30,7 @@ import 'react-image-lightbox/style.css'
 import { toast } from 'react-toastify'
 import { ethers } from 'ethers'
 import CrossChainPurchaseModal from '@/components/CrossChainPurchaseModal'
+import CrossChainTransferModal from '@/components/CrossChainTransferModal'
 import { Dialog, Transition } from '@headlessui/react'
 import { Fragment } from 'react'
 
@@ -179,7 +181,9 @@ const CarDetailsPage = () => {
               <h1 className="text-xl sm:text-4xl font-bold text-white">{car.name}</h1>
               <div className="flex items-center py-2 rounded-lg">
                 <FaEthereum className="text-purple-400 text-xl mr-2" />
-                <span className="flex  text-white font-bold lg:text-3xl text-xl ">{formatPrice(car.price)} ETH</span>
+                <span className="flex  text-white font-bold lg:text-3xl text-xl ">
+                  {formatPrice(car.price)} ETH
+                </span>
               </div>
             </div>
 
@@ -395,39 +399,67 @@ const CarDetailsPage = () => {
               {/* Cross-Chain Transfer - Only show for owner */}
               {isConnected && address?.toLowerCase() === car.owner.toLowerCase() && (
                 <div className="bg-gray-800/30 rounded-xl p-6 backdrop-blur-sm">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-md font-semibold text-white">Cross-Chain Transfer</h3>
+                      <div className="flex items-center mt-1 text-sm space-x-2">
+                        <FaExchangeAlt className="h-4 w-4 text-purple-400" />
+                        <span className="text-gray-400">Bridge to Another Chain</span>
+                      </div>
+                    </div>
 
-                  <div className="flex font-bold text-white pb-4 justify-start items-start">
-                    <FaEthereum className="mr-2 text-purple-400" />
-                    <h3 className=''>Price:</h3>
-                    <span className='ml-2 '>{formatPrice(car.price)} ETH</span>
+                    <div className="bg-white/5 rounded-lg p-4 space-y-4">
+                      <div className="flex items-start gap-3">
+                        <Image
+                          src="/images/assets/across.png"
+                          alt="Across Protocol"
+                          width={24}
+                          height={24}
+                          className="rounded-full mt-1"
+                        />
+                        <p className="text-gray-400 text-sm">
+                          Transfer your car listing to another blockchain network using Across
+                          Protocol's secure cross-chain bridge. Enjoy optimized fees and fast
+                          finality.
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => setShowTransferModal(true)}
+                        disabled={car.sold}
+                        className="w-full mt-2 px-6 py-3 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-lg hover:bg-purple-600/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
+                      >
+                        {car.sold ? (
+                          'Car Already Sold'
+                        ) : (
+                          <>
+                            <span>Start Transfer</span>
+                            <FaArrowRight className="h-4 w-4 transform transition-transform group-hover:translate-x-1" />
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
-
-                  <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
-                    <FaExchangeAlt className="mr-2 text-purple-400" />
-                    Cross-Chain Transfer
-                  </h3>
-                  <p className="text-gray-400 mb-4">
-                    Transfer this car NFT to another blockchain network using Across Protocol
-                  </p>
-                  <button
-                    onClick={() => setShowTransferModal(true)}
-                    className="w-full border border-purple-400 text-purple-400 py-3 rounded-lg font-semibold hover:bg-purple-400/10 transition-colors"
-                  >
-                    Bridge to Another Chain
-                  </button>
                 </div>
               )}
+            </div>
 
-              {/* History */}
-              <div className="bg-gray-800/30 rounded-xl p-6 backdrop-blur-sm">
-                <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
-                  <FaHistory className="mr-2 text-purple-400" />
-                  History
-                </h3>
-                <div className="space-y-4">
-                  <HistoryItem action="Listed" date="2 days ago" price="45 ETH" />
-                  <HistoryItem action="Price Changed" date="5 days ago" price="50 ETH" />
-                </div>
+            {/* Cross-Chain Transfer Modal */}
+            <CrossChainTransferModal
+              isOpen={showTransferModal}
+              onClose={() => setShowTransferModal(false)}
+              carId={Number(id)}
+            />
+
+            {/* History */}
+            <div className="bg-gray-800/30 rounded-xl p-6 backdrop-blur-sm">
+              <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
+                <FaHistory className="mr-2 text-purple-400" />
+                History
+              </h3>
+              <div className="space-y-4">
+                <HistoryItem action="Listed" date="2 days ago" price="45 ETH" />
+                <HistoryItem action="Price Changed" date="5 days ago" price="50 ETH" />
               </div>
             </div>
           </div>

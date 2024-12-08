@@ -1,13 +1,22 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+type QuoteResponse = {
+  relayerFeeInUnits?: string
+  relayerFeePct?: number
+  inputAmount?: string
+  error?: string
+  message?: string
+}
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<QuoteResponse>
+) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' })
   }
 
   try {
-    console.log('Requesting quote with body:', req.body)
-    
     const response = await fetch('https://across.to/api/v1/quote', {
       method: 'POST',
       headers: { 
@@ -31,10 +40,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const data = await response.json()
-    console.log('Received quote response:', data)
+    console.log('Quote response:', data)
     res.status(200).json(data)
   } catch (error) {
-    console.error('Error in across-quote API route:', error)
+    console.error('Error in across quote API:', error)
     res.status(500).json({ 
       message: 'Failed to fetch quote from Across Protocol',
       error: error instanceof Error ? error.message : String(error)

@@ -3,6 +3,7 @@ import abi from '../artifacts/contracts/HemDealer.sol/HemDealer.json'
 import crossChainAbi from '../artifacts/contracts/HemDealerCrossChain.sol/HemDealerCrossChain.json'
 import { CarParams, CarStruct, SalesStruct } from '@/utils/type.dt'
 import { chainConfig } from '../config/chains'
+import contractAddresses from '@/contracts/contractAddresses.json';
 
 const toWei = (num: number) => ethers.parseEther(num.toString())
 const fromWei = (num: number) => ethers.formatEther(num)
@@ -28,9 +29,14 @@ const getEthereumContract = async (chainId?: number) => {
   try {
     const accounts = await ethereum?.request?.({ method: 'eth_accounts' })
     const currentChainId = chainId || (await ethereum?.request({ method: 'eth_chainId' }))
-    const config = getChainConfig(Number(currentChainId))
+    const chainKey = Object.keys(contractAddresses).find(key => 
+      Number(currentChainId) === chainConfig[key as keyof typeof chainConfig].chainId
+    )
     
-    if (!config) throw new Error('Unsupported chain')
+    if (!chainKey) throw new Error('Unsupported chain')
+
+    const config = chainConfig[chainKey as keyof typeof chainConfig]
+    const contractAddress = contractAddresses[chainKey as keyof typeof contractAddresses].HemDealer
 
     if (accounts?.length > 0) {
       if (!cachedProvider || cachedChainId !== currentChainId) {
@@ -39,13 +45,13 @@ const getEthereumContract = async (chainId?: number) => {
       }
       if (!cachedContract || cachedChainId !== currentChainId) {
         const signer = await cachedProvider.getSigner()
-        cachedContract = new ethers.Contract(config.contracts.HemDealer, abi.abi, signer)
+        cachedContract = new ethers.Contract(contractAddress, abi.abi, signer)
         cachedChainId = currentChainId
       }
       return cachedContract
     } else {
-      const provider = new ethers.JsonRpcProvider(config.rpcUrl)
-      const contract = new ethers.Contract(config.contracts.HemDealer, abi.abi, provider)
+      const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL)
+      const contract = new ethers.Contract(contractAddress, abi.abi, provider)
       return contract
     }
   } catch (error) {
@@ -55,26 +61,37 @@ const getEthereumContract = async (chainId?: number) => {
 }
 
 const getCrossChainContract = async (chainId?: number) => {
-  
+  try {
     const accounts = await ethereum?.request?.({ method: 'eth_accounts' })
     const currentChainId = chainId || (await ethereum?.request({ method: 'eth_chainId' }))
-    const config = getChainConfig(Number(currentChainId))
+    const chainKey = Object.keys(contractAddresses).find(key => 
+      Number(currentChainId) === chainConfig[key as keyof typeof chainConfig].chainId
+    )
     
-    if (!config) throw new Error('Unsupported chain')
+    if (!chainKey) throw new Error('Unsupported chain')
+
+    const config = chainConfig[chainKey as keyof typeof chainConfig]
+    const contractAddress = contractAddresses[chainKey as keyof typeof contractAddresses].HemDealerCrossChain
 
     if (accounts?.length > 0) {
       const provider = new ethers.BrowserProvider(ethereum)
       const signer = await provider.getSigner()
-      const contract = new ethers.Contract(config.contracts.HemDealerCrossChain, crossChainAbi.abi, signer)
+      const contract = new ethers.Contract(contractAddress, crossChainAbi.abi, signer)
 
       return contract
     } else {
       const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL)
 
-      const contract = new ethers.Contract(config.contracts.HemDealerCrossChain, crossChainAbi.abi, provider)
+      const contract = new ethers.Contract(contractAddress, crossChainAbi.abi, provider)
       return contract
     }
-  } 
+  } catch (error) {
+    console.error('Failed to get Cross Chain contract:', error)
+    throw error
+  }
+}
+
+  
 
 
 const listCar = async (car: CarParams): Promise<void> => {

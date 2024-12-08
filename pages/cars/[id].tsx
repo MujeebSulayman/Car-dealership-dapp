@@ -20,7 +20,7 @@ import {
   FaWallet,
   FaExclamationTriangle,
 } from 'react-icons/fa'
-import { getCar, getEthereumContract, purchaseCarFromChain, buyCar, deleteCar } from '@/services/blockchain'
+import { getCar, purchaseCarFromChain, deleteCar } from '@/services/blockchain'
 import { CarStruct, CarCondition, CarTransmission, FuelType } from '@/utils/type.dt'
 import { useAccount, useConnect } from 'wagmi'
 import { InjectedConnector } from 'wagmi/connectors/injected'
@@ -56,8 +56,6 @@ const CarDetailsPage = () => {
     connector: new InjectedConnector(),
   })
   const [isOpen, setIsOpen] = useState(false)
-  const [isTransferring, setIsTransferring] = useState(false)
-  const [destinationChain, setDestinationChain] = useState<number>(0)
   const [showTransferModal, setShowTransferModal] = useState(false)
   const [showPurchaseModal, setShowPurchaseModal] = useState(false)
   const [isPurchasing, setIsPurchasing] = useState(false)
@@ -108,18 +106,13 @@ const CarDetailsPage = () => {
       toast.error('Please connect your wallet first')
       return
     }
-    // Always show the chain selection modal
     setShowPurchaseModal(true)
   }
 
   const handleChainPurchase = async (chainId: number, price: string) => {
     setIsPurchasing(true)
     try {
-      await purchaseCarFromChain(
-        Number(id),
-        chainId,
-        price
-      )
+      await purchaseCarFromChain(Number(id), chainId, price)
       toast.success('Purchase initiated successfully!')
       router.push(`/cars/${id}`)
     } catch (error: any) {
@@ -143,22 +136,6 @@ const CarDetailsPage = () => {
     } finally {
       setIsDeleting(false)
       setShowDeleteModal(false)
-    }
-  }
-
-  const handleCrossChainPurchase = async (chainId: number, amount: string) => {
-    if (!car) return
-    setIsPurchasing(true)
-    try {
-      await purchaseCarFromChain(car.id, chainId, amount)
-      toast.success('Cross-chain purchase initiated!')
-      router.reload()
-    } catch (error) {
-      console.error('Error in cross-chain purchase:', error)
-      toast.error('Failed to complete purchase')
-    } finally {
-      setIsPurchasing(false)
-      setShowPurchaseModal(false)
     }
   }
 
@@ -203,10 +180,6 @@ const CarDetailsPage = () => {
               <div className="flex items-center">
                 <FaMapMarkerAlt className="mr-2" />
                 <span>{car.location}</span>
-              </div>
-              <span className="hidden sm:inline">•</span>
-              <div className="flex items-center">
-                <FaClock className="mr-2" />
               </div>
             </div>
             <div className="flex items-center text-2xl sm:text-3xl font-bold text-white">
@@ -373,8 +346,8 @@ const CarDetailsPage = () => {
                     onClick={() => router.push(`/cars/edit/${id}`)}
                     disabled={car.sold}
                     className={`w-full px-6 py-3 ${
-                      car.sold 
-                        ? 'bg-gray-600 cursor-not-allowed' 
+                      car.sold
+                        ? 'bg-gray-600 cursor-not-allowed'
                         : 'bg-purple-600 hover:bg-purple-700'
                     } text-white rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium`}
                   >
@@ -393,19 +366,18 @@ const CarDetailsPage = () => {
                   onClick={handlePurchase}
                   disabled={loading || isPurchasing || isLoading || car.sold}
                   className={`w-full px-6 py-3 ${
-                    car.sold 
-                      ? 'bg-gray-600 cursor-not-allowed' 
+                    car.sold
+                      ? 'bg-gray-600 cursor-not-allowed'
                       : 'bg-purple-600 hover:bg-purple-700'
                   } text-white rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium`}
                 >
-                  {car.sold 
-                    ? 'Car Already Sold' 
-                    : isPurchasing 
-                      ? 'Processing Purchase...' 
-                      : isLoading 
-                        ? 'Loading...' 
-                        : 'Purchase Now'
-                  }
+                  {car.sold
+                    ? 'Car Already Sold'
+                    : isPurchasing
+                    ? 'Processing Purchase...'
+                    : isLoading
+                    ? 'Loading...'
+                    : 'Purchase Now'}
                 </button>
               ) : (
                 <button
@@ -421,6 +393,13 @@ const CarDetailsPage = () => {
               {/* Cross-Chain Transfer - Only show for owner */}
               {isConnected && address?.toLowerCase() === car.owner.toLowerCase() && (
                 <div className="bg-gray-800/30 rounded-xl p-6 backdrop-blur-sm">
+
+                  <div className="flex font-bold text-white pb-4 justify-start items-start">
+                    <FaEthereum className="mr-2 text-purple-400" />
+                    <h3 className=''>Price:</h3>
+                    <span className='ml-2 '>{formatPrice(car.price)} ETH</span>
+                  </div>
+
                   <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
                     <FaExchangeAlt className="mr-2 text-purple-400" />
                     Cross-Chain Transfer
@@ -453,7 +432,11 @@ const CarDetailsPage = () => {
         </div>
       </div>
       <Transition appear show={showDeleteModal} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={() => !isDeleting && setShowDeleteModal(false)}>
+        <Dialog
+          as="div"
+          className="relative z-50"
+          onClose={() => !isDeleting && setShowDeleteModal(false)}
+        >
           <Transition.Child
             as={Fragment}
             enter="ease-out duration-300"
@@ -486,7 +469,8 @@ const CarDetailsPage = () => {
                   </Dialog.Title>
                   <div className="mt-2">
                     <p className="text-gray-300 text-center">
-                      Are you sure you want to delete this car listing? This action cannot be undone.
+                      Are you sure you want to delete this car listing? This action cannot be
+                      undone.
                     </p>
                   </div>
 

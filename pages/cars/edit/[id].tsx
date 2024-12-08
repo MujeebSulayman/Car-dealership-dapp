@@ -54,6 +54,11 @@ const EditCarPage = () => {
       if (!id) return
       try {
         const carData = await getCar(Number(id))
+        if (!carData) {
+          toast.error('This car listing does not exist or has been deleted')
+          router.push('/cars')
+          return
+        }
         if (carData.owner.toLowerCase() !== address?.toLowerCase()) {
           toast.error('You are not authorized to edit this car')
           router.push(`/cars/${id}`)
@@ -154,7 +159,7 @@ const EditCarPage = () => {
 
     setIsDeleting(true)
     try {
-      await deleteCar(id)
+      await deleteCar(Number(id))
       toast.success('Car deleted successfully')
       router.push('/')
     } catch (error) {

@@ -30,7 +30,7 @@ export default function CrossChainTransferModal({
     const chain = CHAIN_DATA[chainKey as keyof typeof CHAIN_DATA]
     
     try {
-      // Get quote for estimation using minimum amount
+     
       const response = await fetch('/api/across-quote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

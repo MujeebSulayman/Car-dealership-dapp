@@ -34,10 +34,24 @@ export default function CrossChainPurchaseModal({
         setChainPrice(carPrice)
         setSelectedChain(chainId)
       } else {
-        const quote = await getAcrossQuote(Number(ethers.parseEther(carPrice)), chainId)
-        const price = ethers.formatEther(quote.amount)
-        setChainPrice(price)
-        setSelectedChain(chainId)
+        try {
+          const quote = await getAcrossQuote(Number(ethers.parseEther(carPrice)), chainId)
+          const price = ethers.formatEther(quote.amount)
+          setChainPrice(price)
+          setSelectedChain(chainId)
+        } catch (quoteError) {
+          console.error('Quote API error:', quoteError)
+          
+          // Fallback calculation: Add a fixed percentage for cross-chain transfer
+          const originalPrice = Number(carPrice)
+          const crossChainFee = originalPrice * 0.01 // 1% cross-chain fee
+          const estimatedPrice = originalPrice + crossChainFee
+          
+          setChainPrice(estimatedPrice.toString())
+          setSelectedChain(chainId)
+          
+          toast.warning('Unable to get exact quote. Using estimated price.')
+        }
       }
     } catch (error) {
       console.error('Error getting chain price:', error)

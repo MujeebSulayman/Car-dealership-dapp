@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { ethers } from 'ethers'
 
 type QuoteResponse = {
   relayerFeeInUnits?: string
@@ -6,6 +7,11 @@ type QuoteResponse = {
   inputAmount?: string
   error?: string
   message?: string
+  outputAmount?: string
+  timestamp?: number
+  destinationChainId?: string
+  originChainId?: string
+  details?: string
 }
 
 export default async function handler(
@@ -17,36 +23,39 @@ export default async function handler(
   }
 
   try {
-    const response = await fetch('https://across.to/api/v1/quote', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(req.body)
-    })
+    const { 
+      amount, 
+      destinationChainId, 
+      originChainId 
+    } = req.body
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('Across API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText
-      })
-      return res.status(response.status).json({ 
-        message: 'Failed to fetch quote from Across Protocol',
-        error: errorText
-      })
+    // Basic validation
+    if (!amount || !destinationChainId || !originChainId) {
+      return res.status(400).json({ error: 'Missing required parameters' })
     }
 
-    const data = await response.json()
-    console.log('Quote response:', data)
-    res.status(200).json(data)
+    // Mock quote generation
+    const inputAmount = BigInt(amount)
+    const relayerFeePct = 100 // 1% (integer basis points)
+    const feeAmount = inputAmount * BigInt(relayerFeePct) / BigInt(10000)
+    const outputAmount = inputAmount + feeAmount
+
+    return res.status(200).json({
+      inputAmount: amount,
+      outputAmount: outputAmount.toString(),
+      relayerFeePct: 1, // 1% as integer
+      relayerFeeInUnits: feeAmount.toString(), // Actual fee in units
+      timestamp: Math.floor(Date.now() / 1000),
+      destinationChainId: destinationChainId,
+      originChainId: originChainId
+    })
   } catch (error) {
-    console.error('Error in across quote API:', error)
-    res.status(500).json({ 
-      message: 'Failed to fetch quote from Across Protocol',
-      error: error instanceof Error ? error.message : String(error)
+    console.error('Across Quote API Error:', error)
+    return res.status(500).json({ 
+      error: 'Failed to generate quote', 
+      details: error instanceof Error ? error.message : 'Unknown error',
+      relayerFeePct: 1, // Default safe value
+      inputAmount: req.body.amount // Return original amount
     })
   }
 }

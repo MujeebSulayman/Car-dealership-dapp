@@ -9,7 +9,6 @@ import {
   FaTachometerAlt,
   FaPaintBrush,
   FaMapMarkerAlt,
-  FaClock,
   FaCalendar,
   FaShieldAlt,
   FaHistory,

@@ -11,3 +11,4 @@ export const chainConfig = {
     explorer: 'https://sepolia.etherscan.io'
   }
 }
+

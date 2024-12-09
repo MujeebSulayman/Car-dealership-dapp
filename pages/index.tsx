@@ -3,7 +3,7 @@ import Hero from '@/components/Hero'
 import Makers from '@/components/Makers'
 import CarList from '@/components/CarList'
 import { CarStruct } from '@/utils/type.dt'
-import { getEthereumContract } from '@/services/blockchain'
+import { getAllCars, getEthereumContract } from '@/services/blockchain'
 
 import { useRouter } from 'next/navigation'
 
@@ -16,8 +16,7 @@ const Home = () => {
   useEffect(() => {
     const loadCars = async () => {
       try {
-        const contract = await getEthereumContract()
-        const allCars = await contract.getAllCars()
+        const allCars = await getAllCars()
         setCars(allCars)
       } catch (error) {
         console.error('Error loading cars:', error)

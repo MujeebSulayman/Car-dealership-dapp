@@ -30,7 +30,7 @@ const carBrands: Brand[] = [
     description: 'Pioneering luxury automotive engineering',
     country: 'Germany',
     foundedYear: 1886,
-    supportedChains: ['Ethereum', 'Polygon']
+    supportedChains: ['Ethereum', 'Polygon'],
   },
   {
     name: 'BMW',
@@ -38,7 +38,7 @@ const carBrands: Brand[] = [
     description: 'The ultimate driving machine',
     country: 'Germany',
     foundedYear: 1916,
-    supportedChains: ['Binance Smart Chain']
+    supportedChains: ['Binance Smart Chain'],
   },
   {
     name: 'Audi',
@@ -46,7 +46,7 @@ const carBrands: Brand[] = [
     description: 'Vorsprung durch Technik',
     country: 'Germany',
     foundedYear: 1909,
-    supportedChains: ['Ethereum']
+    supportedChains: ['Ethereum'],
   },
   {
     name: 'Porsche',
@@ -54,7 +54,7 @@ const carBrands: Brand[] = [
     description: 'High-performance sports cars',
     country: 'Germany',
     foundedYear: 1931,
-    supportedChains: ['Polygon']
+    supportedChains: ['Polygon'],
   },
   {
     name: 'Tesla',
@@ -62,7 +62,7 @@ const carBrands: Brand[] = [
     description: 'Electric vehicles and clean energy',
     country: 'United States',
     foundedYear: 2003,
-    supportedChains: ['Ethereum', 'Binance Smart Chain']
+    supportedChains: ['Ethereum', 'Binance Smart Chain'],
   },
   {
     name: 'Ferrari',
@@ -70,7 +70,7 @@ const carBrands: Brand[] = [
     description: 'Italian luxury sports cars',
     country: 'Italy',
     foundedYear: 1939,
-    supportedChains: ['Polygon']
+    supportedChains: ['Polygon'],
   },
   {
     name: 'Lamborghini',
@@ -78,7 +78,7 @@ const carBrands: Brand[] = [
     description: 'Extreme performance and design',
     country: 'Italy',
     foundedYear: 1963,
-    supportedChains: ['Ethereum']
+    supportedChains: ['Ethereum'],
   },
   {
     name: 'Rolls-Royce',
@@ -86,8 +86,8 @@ const carBrands: Brand[] = [
     description: 'Unparalleled luxury and craftsmanship',
     country: 'United Kingdom',
     foundedYear: 1904,
-    supportedChains: ['Binance Smart Chain']
-  }
+    supportedChains: ['Binance Smart Chain'],
+  },
 ]
 
 const Brands: React.FC = () => {
@@ -96,15 +96,16 @@ const Brands: React.FC = () => {
   const [selectedChain, setSelectedChain] = useState<string | null>(null)
 
   // Unique countries and chains
-  const countries = [...new Set(carBrands.map(brand => brand.country))]
-  const supportedChains = [...new Set(carBrands.flatMap(brand => brand.supportedChains || []))]
+  const countries = [...new Set(carBrands.map((brand) => brand.country))]
+  const supportedChains = [...new Set(carBrands.flatMap((brand) => brand.supportedChains || []))]
 
   // Filtered brands
-  const filteredBrands = carBrands.filter(brand => 
-    (brand.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-     brand.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
-    (!selectedCountry || brand.country === selectedCountry) &&
-    (!selectedChain || brand.supportedChains?.includes(selectedChain))
+  const filteredBrands = carBrands.filter(
+    (brand) =>
+      (brand.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        brand.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      (!selectedCountry || brand.country === selectedCountry) &&
+      (!selectedChain || brand.supportedChains?.includes(selectedChain))
   )
 
   const resetFilters = () => {
@@ -122,7 +123,7 @@ const Brands: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8">
         {/* Header */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
@@ -132,7 +133,8 @@ const Brands: React.FC = () => {
             Premium Car Brands
           </h1>
           <p className="text-gray-400 max-w-2xl mx-auto">
-            Discover the world's most prestigious automotive manufacturers with blockchain-enabled marketplace
+            Discover the world's most prestigious automotive manufacturers with blockchain-enabled
+            marketplace
           </p>
         </motion.div>
 
@@ -151,27 +153,29 @@ const Brands: React.FC = () => {
               />
             </div>
 
-            {/* Country Filter */}
             <select
               value={selectedCountry || ''}
               onChange={(e) => setSelectedCountry(e.target.value || null)}
               className="bg-gray-800/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
               <option value="">All Countries</option>
-              {countries.map(country => (
-                <option key={country} value={country}>{country}</option>
+              {countries.map((country) => (
+                <option key={country} value={country}>
+                  {country}
+                </option>
               ))}
             </select>
 
-            {/* Blockchain Filter */}
             <select
               value={selectedChain || ''}
               onChange={(e) => setSelectedChain(e.target.value || null)}
               className="bg-gray-800/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
               <option value="">All Blockchains</option>
-              {supportedChains.map(chain => (
-                <option key={chain} value={chain}>{chain}</option>
+              {supportedChains.map((chain) => (
+                <option key={chain} value={chain}>
+                  {chain}
+                </option>
               ))}
             </select>
 
@@ -215,7 +219,7 @@ const Brands: React.FC = () => {
                     {brand.name}
                   </h2>
                   <p className="text-gray-400 mb-4 text-sm">{brand.description}</p>
-                  
+
                   {/* Brand Metadata */}
                   <div className="flex justify-between text-sm text-gray-500 mb-4">
                     <span>🌍 {brand.country}</span>
@@ -225,9 +229,9 @@ const Brands: React.FC = () => {
                   {/* Blockchain Tags */}
                   {brand.supportedChains && (
                     <div className="flex flex-wrap justify-center gap-2">
-                      {brand.supportedChains.map(chain => (
-                        <span 
-                          key={chain} 
+                      {brand.supportedChains.map((chain) => (
+                        <span
+                          key={chain}
                           className="px-2 py-1 bg-purple-500/10 text-purple-400 rounded-full text-xs"
                         >
                           {chain}

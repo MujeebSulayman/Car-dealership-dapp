@@ -284,11 +284,28 @@ const getMyCars = async (): Promise<CarStruct[]> => {
 const getAllSales = async (): Promise<SalesStruct[]> => {
   try {
     const contract = await getEthereumContract()
-    tx = await contract.getAllSales()
-    return Promise.resolve(tx)
+
+    if (!contract.getAllSales) {
+      console.error('getAllSales method not found on contract')
+      return []
+    }
+    const salesData = await contract.getAllSales()
+    
+    console.log('Raw sales data from contract:', salesData)
+    const validSales = salesData.map((sale: any) => ({
+      id: Number(sale.id || 0),
+      newCarId: Number(sale.newCarId || 0),
+      price: sale.price ? BigInt(sale.price.toString()) : BigInt(0),
+      owner: sale.owner || ''
+    })).filter((sale: SalesStruct) => sale.newCarId > 0)
+
+    console.log('Processed sales data:', validSales)
+
+    return validSales
   } catch (error) {
+    console.error('Error in getAllSales:', error)
     reportError(error)
-    return Promise.reject(error)
+    return []
   }
 }
 
@@ -474,7 +491,7 @@ const getAcrossQuote = async (
     const data = await response.json()
     console.log('Received quote data:', data)
     return {
-      relayerFeePct: data.relayerFeePct || 0.1, // Fallback to 0.1% if not provided
+      relayerFeePct: data.relayerFeePct || 0.1,
       quoteTimestamp: data.timestamp,
       amount: data.updatedOutputAmount || data.outputAmount,
     }

@@ -24,6 +24,8 @@ const Header: React.FC = () => {
     { href: '/cars', label: 'Marketplace' },
     { href: '/brands', label: 'Brands' },
     ...(address ? [{ href: '/cars/list', label: 'Sell Your Car' }] : []),
+    ...(address ? [{ href: '/cars/myListings', label: 'My Listings' }] : []),
+
   ]
 
   return (

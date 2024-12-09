@@ -3,7 +3,6 @@ import abi from '../artifacts/contracts/HemDealer.sol/HemDealer.json'
 import crossChainAbi from '../artifacts/contracts/HemDealerCrossChain.sol/HemDealerCrossChain.json'
 import { CarParams, CarStruct, SalesStruct } from '@/utils/type.dt'
 import { chainConfig } from '../config/chains'
-import address from '@/contracts/contractAddresses.json'
 
 const toWei = (num: number) => ethers.parseEther(num.toString())
 const fromWei = (num: number) => ethers.formatEther(num)
@@ -26,6 +25,14 @@ const getChainConfig = (chainId: number) => {
 
 const getEthereumContract = async (chainId?: number) => {
   try {
+    // If no ethereum object, use read-only provider
+    if (!ethereum) {
+      console.warn('No wallet provider detected. Using read-only provider.')
+      const config = chainConfig.sepolia
+      const provider = new ethers.JsonRpcProvider(config.rpcUrl)
+      return new ethers.Contract(config.contracts.HemDealer, abi.abi, provider)
+    }
+
     const accounts = await ethereum?.request?.({ method: 'eth_accounts' })
     const currentChainId = chainId || (await ethereum?.request({ method: 'eth_chainId' }))
     const config = getChainConfig(Number(currentChainId))
@@ -50,7 +57,11 @@ const getEthereumContract = async (chainId?: number) => {
     }
   } catch (error) {
     console.error('Failed to get Ethereum contract:', error)
-    throw error
+
+    // Fallback to read-only provider
+    const config = chainConfig.sepolia
+    const provider = new ethers.JsonRpcProvider(config.rpcUrl)
+    return new ethers.Contract(config.contracts.HemDealer, abi.abi, provider)
   }
 }
 
@@ -73,27 +84,12 @@ const getCrossChainContract = async (chainId?: number) => {
     return contract
   } else {
     const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL)
+
     const contract = new ethers.Contract(
       config.contracts.HemDealerCrossChain,
       crossChainAbi.abi,
       provider
     )
-
-    return contract
-  }
-}
-
-export const getEthereumContracts = async () => {
-  const accounts = await ethereum.request({ method: 'eth_accounts' })
-
-  if (accounts.length > 0) {
-    const provider = new ethers.BrowserProvider(ethereum)
-    const signer = await provider.getSigner()
-    const contract = new ethers.Contract(address.sepolia.HemDealer, abi.abi, signer)
-    return contract
-  } else {
-    const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL)
-    const contract = new ethers.Contract(address.sepolia.HemDealer, abi.abi, provider)
     return contract
   }
 }
@@ -259,21 +255,41 @@ const getCar = async (carId: number): Promise<CarStruct | null> => {
 }
 
 const getAllCars = async (): Promise<CarStruct[]> => {
-  const contract = await getEthereumContracts()
-  const cars = await contract.getAllCars()
-  return cars
+  try {
+    const config = chainConfig.sepolia
+    const provider = new ethers.JsonRpcProvider(config.rpcUrl)
+    const contract = new ethers.Contract(config.contracts.HemDealer, abi.abi, provider)
+
+    const cars: CarStruct[] = await contract.getAllCars()
+
+    console.log('Fetched Cars (Fallback Method):', cars)
+    return cars
+  } catch (error) {
+    console.error('Error fetching cars:', error)
+    return []
+  }
 }
 
 const getMyCars = async (): Promise<CarStruct[]> => {
-  const contract = await getEthereumContracts()
-  const cars = await contract.getMyCars()
-  return cars
+  try {
+    const contract = await getEthereumContract()
+    tx = await contract.getMyCars()
+    return Promise.resolve(tx)
+  } catch (error) {
+    reportError(error)
+    return Promise.reject(error)
+  }
 }
 
 const getAllSales = async (): Promise<SalesStruct[]> => {
-  const contract = await getEthereumContracts()
-  const cars = await contract.getAllSales()
-  return cars
+  try {
+    const contract = await getEthereumContract()
+    tx = await contract.getAllSales()
+    return Promise.resolve(tx)
+  } catch (error) {
+    reportError(error)
+    return Promise.reject(error)
+  }
 }
 
 const buyCar = async (carId: number): Promise<void> => {

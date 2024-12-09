@@ -1,25 +1,37 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
+
 import Image from 'next/image'
+
 import { useRouter } from 'next/router'
+
 import { FaEthereum, FaFilter, FaSearch } from 'react-icons/fa'
+
 import { CarStruct, CarCondition, FuelType, CarTransmission } from '@/utils/type.dt'
+
 import Link from 'next/link'
 
 interface CarListProps {
   cars: CarStruct[]
+
   loading: boolean
 }
 
 const CarList: React.FC<CarListProps> = ({ cars, loading }) => {
   const router = useRouter()
+
   const [searchTerm, setSearchTerm] = useState('')
+
   const [filters, setFilters] = useState({
     condition: '',
+
     fuelType: '',
+
     transmission: '',
+
     priceRange: '',
   })
+
   const [showMobileFilters, setShowMobileFilters] = useState(false)
 
   const filteredCars = cars.filter((car) => {
@@ -29,7 +41,9 @@ const CarList: React.FC<CarListProps> = ({ cars, loading }) => {
       car.model.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesCondition = !filters.condition || car.condition.toString() === filters.condition
+
     const matchesFuelType = !filters.fuelType || car.fuelType.toString() === filters.fuelType
+
     const matchesTransmission =
       !filters.transmission || car.transmission.toString() === filters.transmission
 
@@ -43,10 +57,12 @@ const CarList: React.FC<CarListProps> = ({ cars, loading }) => {
   return (
     <div className="px-4 md:px-0 max-w-7xl mx-auto">
       {/* Search and Filter Section */}
+
       <div className="mb-8 space-y-4">
         <div className="flex flex-col gap-4">
           <div className="flex-1 relative">
             <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+
             <input
               type="text"
               placeholder="Search cars..."
@@ -57,6 +73,7 @@ const CarList: React.FC<CarListProps> = ({ cars, loading }) => {
           </div>
 
           {/* Filter button for mobile */}
+
           <button
             className="md:hidden flex items-center justify-center gap-2 bg-gray-800/50 rounded-lg px-4 py-3 text-white"
             onClick={() => setShowMobileFilters(!showMobileFilters)}
@@ -66,15 +83,18 @@ const CarList: React.FC<CarListProps> = ({ cars, loading }) => {
           </button>
 
           {/* Mobile filters drawer */}
+
           {showMobileFilters && (
             <div className="fixed inset-0 bg-black/50 z-50 md:hidden">
               <div className="bg-gray-900 h-[70vh] w-full absolute bottom-0 rounded-t-2xl p-6">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-xl font-bold text-white">Filters</h3>
+
                   <button onClick={() => setShowMobileFilters(false)} className="text-gray-400">
                     Close
                   </button>
                 </div>
+
                 <div className="space-y-4">
                   <select
                     value={filters.condition}
@@ -82,6 +102,7 @@ const CarList: React.FC<CarListProps> = ({ cars, loading }) => {
                     className="w-full bg-gray-800/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     <option value="">Condition</option>
+
                     {Object.entries(CarCondition).map(
                       ([key, value]) =>
                         typeof value === 'number' && (
@@ -91,12 +112,14 @@ const CarList: React.FC<CarListProps> = ({ cars, loading }) => {
                         )
                     )}
                   </select>
+
                   <select
                     value={filters.fuelType}
                     onChange={(e) => setFilters({ ...filters, fuelType: e.target.value })}
                     className="w-full bg-gray-800/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     <option value="">Fuel Type</option>
+
                     {Object.entries(FuelType).map(
                       ([key, value]) =>
                         typeof value === 'number' && (
@@ -106,12 +129,14 @@ const CarList: React.FC<CarListProps> = ({ cars, loading }) => {
                         )
                     )}
                   </select>
+
                   <select
                     value={filters.transmission}
                     onChange={(e) => setFilters({ ...filters, transmission: e.target.value })}
                     className="w-full bg-gray-800/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     <option value="">Transmission</option>
+
                     {Object.entries(CarTransmission).map(
                       ([key, value]) =>
                         typeof value === 'number' && (
@@ -127,6 +152,7 @@ const CarList: React.FC<CarListProps> = ({ cars, loading }) => {
           )}
 
           {/* Desktop filters - hide on mobile */}
+
           <div className="hidden md:grid grid-cols-4 gap-4">
             <select
               value={filters.condition}
@@ -134,6 +160,7 @@ const CarList: React.FC<CarListProps> = ({ cars, loading }) => {
               className="bg-gray-800/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
               <option value="">Condition</option>
+
               {Object.entries(CarCondition).map(
                 ([key, value]) =>
                   typeof value === 'number' && (
@@ -143,12 +170,14 @@ const CarList: React.FC<CarListProps> = ({ cars, loading }) => {
                   )
               )}
             </select>
+
             <select
               value={filters.fuelType}
               onChange={(e) => setFilters({ ...filters, fuelType: e.target.value })}
               className="bg-gray-800/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
               <option value="">Fuel Type</option>
+
               {Object.entries(FuelType).map(
                 ([key, value]) =>
                   typeof value === 'number' && (
@@ -158,12 +187,14 @@ const CarList: React.FC<CarListProps> = ({ cars, loading }) => {
                   )
               )}
             </select>
+
             <select
               value={filters.transmission}
               onChange={(e) => setFilters({ ...filters, transmission: e.target.value })}
               className="bg-gray-800/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
               <option value="">Transmission</option>
+
               {Object.entries(CarTransmission).map(
                 ([key, value]) =>
                   typeof value === 'number' && (
@@ -178,11 +209,13 @@ const CarList: React.FC<CarListProps> = ({ cars, loading }) => {
       </div>
 
       {/* Results Count */}
+
       <div className="mb-6 text-gray-400">
         Found {filteredCars.length} {filteredCars.length === 1 ? 'car' : 'cars'}
       </div>
 
       {/* Cars Grid */}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {filteredCars.map((car, index) => (
           <Link href={`/cars/${car.id}`} key={car.id}>
@@ -219,8 +252,10 @@ const CarList: React.FC<CarListProps> = ({ cars, loading }) => {
                       {car.name}
                     </h3>
                   </div>
+
                   <div className="flex items-center text-white font-bold">
                     <FaEthereum className="text-purple-400 mr-1" />
+
                     {Number(car.price) / 10 ** 18}
                   </div>
                 </div>
@@ -228,10 +263,13 @@ const CarList: React.FC<CarListProps> = ({ cars, loading }) => {
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div className="bg-gray-700/30 rounded-lg p-2">
                     <div className="text-gray-400 text-sm">Year</div>
+
                     <div className="text-white">{car.year.toString()}</div>
                   </div>
+
                   <div className="bg-gray-700/30 rounded-lg p-2">
                     <div className="text-gray-400 text-sm">Mileage</div>
+
                     <div className="text-white">{car.mileage.toString()} km</div>
                   </div>
                 </div>
@@ -262,13 +300,18 @@ const LoadingState = () => (
     {[1, 2, 3, 4, 5, 6].map((i) => (
       <div key={i} className="bg-gray-800/30 rounded-xl overflow-hidden animate-pulse">
         <div className="aspect-[16/9] bg-gray-700/50" />
+
         <div className="p-6 space-y-4">
           <div className="h-6 bg-gray-700/50 rounded w-3/4" />
+
           <div className="h-4 bg-gray-700/50 rounded w-1/2" />
+
           <div className="grid grid-cols-2 gap-4">
             <div className="h-12 bg-gray-700/50 rounded" />
+
             <div className="h-12 bg-gray-700/50 rounded" />
           </div>
+
           <div className="h-12 bg-gray-700/50 rounded" />
         </div>
       </div>

@@ -10,7 +10,10 @@ const CarsPage = () => {
   useEffect(() => {
     const loadCars = async () => {
       try {
+        console.log('Fetching cars...')
         const allCars = await getAllCars()
+        console.log('Fetched Cars:', allCars)
+        console.log('Number of Cars:', allCars.length)
         setCars(allCars)
       } catch (error) {
         console.error('Error loading cars:', error)

@@ -23,7 +23,7 @@ const SalesHistoryPage: React.FC = () => {
       try {
         setLoading(true)
         setError(null)
-        
+
         const salesData = await getAllSales()
 
         if (!salesData || salesData.length === 0) {
@@ -56,7 +56,7 @@ const SalesHistoryPage: React.FC = () => {
           })
         )
 
-        const validSales = enhancedSales.filter(sale => sale !== null) as EnhancedSaleStruct[]
+        const validSales = enhancedSales.filter((sale) => sale !== null) as EnhancedSaleStruct[]
 
         if (validSales.length === 0) {
           setError('No valid sales data could be retrieved.')
@@ -92,12 +92,12 @@ const SalesHistoryPage: React.FC = () => {
 
         {loading ? (
           <div className="flex justify-center items-center h-64">
-            <motion.div 
+            <motion.div
               animate={{ rotate: 360 }}
-              transition={{ 
-                repeat: Infinity, 
-                duration: 1, 
-                ease: "linear" 
+              transition={{
+                repeat: Infinity,
+                duration: 1,
+                ease: 'linear',
               }}
               className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full"
             />
@@ -115,24 +115,24 @@ const SalesHistoryPage: React.FC = () => {
             <p className="text-sm mt-2">Looks like there are no sales records yet.</p>
           </div>
         ) : (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4"
           >
             {sales.map((sale) => (
-              <motion.div 
+              <motion.div
                 key={sale.id}
                 whileHover={{ scale: 1.05 }}
-                transition={{ type: "spring", stiffness: 300 }}
+                transition={{ type: 'spring', stiffness: 300 }}
                 className="bg-gray-800 rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:shadow-2xl"
               >
                 {sale.carDetails && (
                   <div className="relative">
-                    <img 
-                      src={sale.carDetails.images[0] || '/placeholder-car.png'} 
-                      alt={`Car ${sale.newCarId}`} 
+                    <img
+                      src={sale.carDetails.images[0] || '/placeholder-car.png'}
+                      alt={`Car ${sale.newCarId}`}
                       className="w-full h-48 object-cover"
                     />
                     <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white px-2 py-1 m-2 rounded">
@@ -140,7 +140,7 @@ const SalesHistoryPage: React.FC = () => {
                     </div>
                   </div>
                 )}
-                
+
                 <div className="p-4 space-y-3">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center">
@@ -148,13 +148,15 @@ const SalesHistoryPage: React.FC = () => {
                       <span className="font-bold text-white">
                         {(() => {
                           try {
+                            const priceValue =
+                              typeof sale.price === 'bigint'
+                                ? sale.price
+                                : typeof sale.price === 'string'
+                                ? BigInt(sale.price)
+                                : typeof sale.price === 'number'
+                                ? BigInt(Math.round(sale.price))
+                                : sale.price
 
-                            const priceValue = 
-                              typeof sale.price === 'bigint' ? sale.price :
-                              typeof sale.price === 'string' ? BigInt(sale.price) :
-                              typeof sale.price === 'number' ? BigInt(Math.round(sale.price)) :
-                              sale.price;
-                            
                             return `${ethers.formatEther(priceValue)} ETH`
                           } catch (error) {
                             console.error('Error formatting price:', error)
@@ -167,33 +169,32 @@ const SalesHistoryPage: React.FC = () => {
                       <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">
                         SOLD
                       </span>
-                      <Link 
-                        href={`/cars/${sale.newCarId}`} 
+                      <Link
+                        href={`/cars/${sale.newCarId}`}
                         className="text-blue-400 hover:text-blue-300 transition-colors"
                       >
                         <FaLink className="inline-block mr-1" /> Details
                       </Link>
                     </div>
                   </div>
-                  
+
                   <div className="border-t border-gray-700 pt-3 mt-3">
                     <p className="text-sm text-gray-300">
                       <span className="font-semibold">Car ID:</span> {sale.newCarId}
                     </p>
                     <p className="text-sm text-gray-300">
-                      <span className="font-semibold">Owner:</span> 
+                      <span className="font-semibold">Owner:</span>
                       <span className="ml-2 bg-gray-700 px-2 py-1 rounded text-xs">
                         {sale.carDetails?.owner ? (
-                          <Link 
-                            href={`https://sepolia.etherscan.io/address/${sale.carDetails.owner}`} 
-                            target="_blank" 
+                          <Link
+                            href={`https://sepolia.etherscan.io/address/${sale.carDetails.owner}`}
+                            target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-400 hover:text-blue-300 transition-colors"
                           >
                             {sale.carDetails.owner.slice(0, 6)}...{sale.carDetails.owner.slice(-4)}
                           </Link>
-                        ) 
-                        : (
+                        ) : (
                           <span className="text-gray-400">Not Available</span>
                         )}
                       </span>

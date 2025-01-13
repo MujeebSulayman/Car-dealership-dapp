@@ -2,7 +2,7 @@ const { ethers } = require('hardhat')
 
 function validateAndFormatAddress(address) {
   try {
-    return ethers.getAddress(address) // Returns checksummed address
+    return ethers.getAddress(address)
   } catch (error) {
     throw new Error(`Invalid address format for ${address}: ${error.message}`)
   }
@@ -17,5 +17,5 @@ function validateAddresses(addresses) {
 
 module.exports = {
   validateAndFormatAddress,
-  validateAddresses
-} 
+  validateAddresses,
+}

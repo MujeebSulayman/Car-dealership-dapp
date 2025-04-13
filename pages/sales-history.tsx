@@ -71,7 +71,6 @@ const SalesHistoryPage: React.FC = () => {
         setLoading(false)
       }
     }
-
     fetchSalesHistory()
   }, [])
 
